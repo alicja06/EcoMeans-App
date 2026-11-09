@@ -4,7 +4,36 @@ import { dayPartsLabel, timeBudgetLabel } from '@/data/home';
 import { addDays, daysBetween, formatShortDate, formatWeekdayName, weekdayIndex } from '@/lib/dates';
 import { frequencyDays } from '@/lib/tasks';
 
+export function buildSuggestedTasks(
+  home: HomeProfile,
+  today: string,
+  excludedLibraryIds: string[] = [],
+): CleaningTask[] {
+  const excluded = new Set(excludedLibraryIds);
+
+  return libraryTasksForHome(home)
+    .filter((item) => !excluded.has(item.id))
+    .sort((a, b) => a.priority - b.priority)
+    .map((item) => ({
+      id: `plan-${item.id}`,
+      roomId: item.roomId,
+      title: item.title,
+      frequency: item.frequency,
+      customDays: item.customDays ?? null,
+      dueDate: today,
+      lastDoneDate: null,
+      previousDueDate: null,
+      minutes: item.minutes,
+      enabled: true,
+      libraryId: item.id,
+      scheduleNote: item.scheduleNote ?? null,
+      source: 'plan',
+    }));
+}
+
 export type DayKind = 'open' | 'big' | 'rest' | 'off';
+
+type CalendarStyle = 'spread' | 'block' | 'mix';
 
 export interface CalendarRules {
   openWeekdays: number[];
@@ -13,7 +42,7 @@ export interface CalendarRules {
   baseMinutes: number;
   bigMinutes: number;
   flexible: boolean;
-  style: Exclude<ScheduleStyle, 'auto'>;
+  style: CalendarStyle;
 }
 
 export interface PlannedDay {
@@ -23,18 +52,46 @@ export interface PlannedDay {
   tasks: CleaningTask[];
 }
 
-function resolveStyle(home: HomeProfile): Exclude<ScheduleStyle, 'auto'> {
-  if (home.style === 'spread' || home.style === 'block' || home.style === 'mix') return home.style;
-  if (home.timeBudget === 'one-day' || home.timeBudget === 'few-days') return 'block';
-  if (home.timeBudget === 'flexible') return 'spread';
+function resolveStyle(home: HomeProfile): CalendarStyle {
+  // Obsługa starszych zapisanych ustawień.
+  if (home.style === 'spread' || home.style === 'block' || home.style === 'mix') {
+    return home.style;
+  }
+
+  // Nowe style rooms, tasks i auto dotyczą organizacji czynności,
+  // a nie sposobu rozłożenia obciążenia w kalendarzu.
+  if (home.timeBudget === 'one-day' || home.timeBudget === 'few-days') {
+    return 'block';
+  }
+
+  if (home.timeBudget === 'flexible') {
+    return 'spread';
+  }
+
   return 'mix';
 }
 
 function selectedWeekdays(home: HomeProfile): number[] {
+  // Nowe ustawienia – indywidualnie wybrane dni.
+  if (Array.isArray(home.cleaningDays) && home.cleaningDays.length > 0) {
+    return [...new Set(
+      home.cleaningDays.filter(
+        (day) => Number.isInteger(day) && day >= 0 && day <= 6,
+      ),
+    )];
+  }
+
+  // Zgodność ze starszymi ustawieniami.
   const days: number[] = [];
+
   if (home.weekdays) days.push(1, 2, 3, 4, 5);
   if (home.weekends) days.push(6, 0);
-  if (days.length === 0) days.push(1, 2, 3, 4, 5, 6, 0);
+
+  // Dotychczasowy domyślny sposób działania.
+  if (days.length === 0) {
+    days.push(1, 2, 3, 4, 5, 6, 0);
+  }
+
   return days;
 }
 

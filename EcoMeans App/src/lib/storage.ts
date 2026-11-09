@@ -27,8 +27,17 @@ function normalizeTask(task: Partial<CleaningTask>, index: number): CleaningTask
   };
 }
 
+
 function normalizeHome(home: Partial<HomeProfile> | undefined, base: HomeProfile): HomeProfile {
   if (!home) return base;
+
+  const cleaningDays = Array.isArray(home.cleaningDays)
+    ? [...new Set(home.cleaningDays.filter((day) => Number.isInteger(day) && day >= 0 && day <= 6))]
+    : [
+        ...(home.weekdays ? [1, 2, 3, 4, 5] : []),
+        ...(home.weekends ? [0, 6] : []),
+      ];
+
   return {
     ...base,
     ...home,
@@ -36,12 +45,14 @@ function normalizeHome(home: Partial<HomeProfile> | undefined, base: HomeProfile
     specialNeeds: home.specialNeeds ?? '',
     places: Array.isArray(home.places) ? home.places : [],
     appliances: Array.isArray(home.appliances) ? home.appliances : [],
+    cleaningDays,
     dayParts: Array.isArray(home.dayParts) ? home.dayParts : [],
     weekdays: home.weekdays ?? false,
     weekends: home.weekends ?? false,
     onboardingComplete: home.onboardingComplete ?? false,
   };
 }
+
 
 export function loadState(): AppState | null {
   try {

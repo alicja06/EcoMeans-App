@@ -1,3 +1,4 @@
+
 import type { ApplianceId, DayPart, HomeProfile, HouseholdSize, ScheduleStyle, TimeBudget } from '@/types';
 
 export interface LabeledOption<T extends string> {
@@ -8,17 +9,26 @@ export interface LabeledOption<T extends string> {
 
 export const HOUSEHOLD_OPTIONS: LabeledOption<HouseholdSize>[] = [
   { id: 'alone', label: 'Mieszkam sam/sama' },
-  { id: 'partner', label: 'Mieszkam z partnerem/partnerką' },
-  { id: 'several', label: 'Mieszkamy w kilka osób' },
-  { id: 'family', label: 'Mieszkam z rodziną i dziećmi' },
+  { id: 'one-other', label: 'Mieszkam z jedną osobą' },
+  { id: 'several', label: 'Mieszkam z kilkoma osobami' },
 ];
 
 export const TIME_BUDGET_OPTIONS: LabeledOption<TimeBudget>[] = [
-  { id: 'm10', label: '10–15 minut dziennie', detail: 'Krótkie porządki, bez długich bloków' },
-  { id: 'm20', label: '20–30 minut dziennie', detail: 'Spokojne tempo przez cały tydzień' },
-  { id: 'few-days', label: '1–2 godziny kilka razy w tygodniu', detail: 'Mniej dni, dłuższe sprzątanie' },
-  { id: 'one-day', label: 'Kilka godzin w jeden wybrany dzień', detail: 'Jeden większy dzień porządków' },
-  { id: 'flexible', label: 'Wolę sprzątać tylko wtedy, kiedy mam czas', detail: 'Plan bez sztywnego limitu minut' },
+  {
+    id: 'm10',
+    label: '10–15 minut dziennie',
+    detail: 'Codziennie, ale krótko',
+  },
+  {
+    id: 'few-days',
+    label: 'Godzina kilka razy w tygodniu',
+    detail: 'Więcej czasu na sprzątanie w wybrane dni',
+  },
+  {
+    id: 'one-day',
+    label: 'Kilka godzin w jeden dzień',
+    detail: 'Zrób wszystko podczas jednego dnia porządków',
+  },
 ];
 
 export const DAY_PART_OPTIONS: LabeledOption<DayPart>[] = [
@@ -28,10 +38,21 @@ export const DAY_PART_OPTIONS: LabeledOption<DayPart>[] = [
 ];
 
 export const STYLE_OPTIONS: LabeledOption<ScheduleStyle>[] = [
-  { id: 'spread', label: 'Krótkie zadania rozłożone na cały tydzień' },
-  { id: 'block', label: 'Większe sprzątanie w wybrane dni' },
-  { id: 'mix', label: 'Połączenie obu sposobów' },
-  { id: 'auto', label: 'Chcę, żeby aplikacja sama zaproponowała najlepszy układ' },
+  {
+    id: 'rooms',
+    label: 'Pomieszczeniami',
+    detail: 'Np. we wtorek kuchnia, w środę łazienka',
+  },
+  {
+    id: 'tasks',
+    label: 'Według rodzaju czynności',
+    detail: 'Np. jednego dnia mycie zlewów w kuchni i łazience',
+  },
+  {
+    id: 'auto',
+    label: 'Bez preferencji',
+    detail: 'Ułóż plan tak, jak będzie najwygodniej',
+  },
 ];
 
 export const APPLIANCE_OPTIONS: LabeledOption<ApplianceId>[] = [
@@ -56,6 +77,7 @@ export function emptyHome(): HomeProfile {
     timeBudget: null,
     weekdays: false,
     weekends: false,
+    cleaningDays: [],
     dayParts: [],
     style: null,
     onboardingComplete: false,
@@ -82,5 +104,10 @@ export function hasPets(home: HomeProfile): boolean {
 }
 
 export function busyHome(home: HomeProfile): boolean {
-  return home.household === 'several' || home.household === 'family' || home.smallChildren === true || hasPets(home);
+  return (
+    home.household === 'several' ||
+    home.household === 'family' ||
+    home.smallChildren === true ||
+    hasPets(home)
+  );
 }

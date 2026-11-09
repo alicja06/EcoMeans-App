@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ApplianceId, CleaningTask, DayPart, HomeProfile, HouseholdSize, RoomId, ScheduleStyle, TimeBudget } from '@/types';
 import {
   APPLIANCE_OPTIONS,
@@ -12,10 +12,58 @@ import { useAppStore } from '@/store/AppStoreContext';
 import { todayISO } from '@/lib/dates';
 import { createId } from '@/lib/ids';
 import { TASK_LIBRARY } from '@/data/taskLibrary';
-import { buildPlanTasks, formatPlanRange, horizonDates, planSubtitle } from '@/lib/schedule';
-import { WeekBoard } from '@/components/plan/WeekBoard';
+import { buildSuggestedTasks } from '@/lib/schedule';
 
 const STAGES = [1, 1, 2, 3, 4, 5];
+
+const CLEANING_DAY_OPTIONS = [
+  { id: 1, label: 'Pon' },
+  { id: 2, label: 'Wt' },
+  { id: 3, label: 'Śr' },
+  { id: 4, label: 'Czw' },
+  { id: 5, label: 'Pt' },
+  { id: 6, label: 'Sob' },
+  { id: 0, label: 'Niedz' },
+];
+
+const FREQUENCY_OPTIONS = [
+  { value: 'daily', label: 'Codziennie' },
+  { value: '2days', label: 'Co 2 dni' },
+  { value: '3days', label: 'Co 3 dni' },
+  { value: 'weekly', label: 'Co tydzień' },
+  { value: 'biweekly', label: 'Co 2 tygodnie' },
+  { value: 'monthly', label: 'Co miesiąc' },
+  { value: 'quarterly', label: 'Co 3 miesiące' },
+];
+
+function getFrequencyValue(task: CleaningTask): string {
+  if (task.frequency === 'custom') {
+    if (task.customDays === 2) return '2days';
+    if (task.customDays === 3) return '3days';
+  }
+
+  return task.frequency;
+}
+
+function getTaskGroup(task: CleaningTask): 'daily' | 'regular' | 'periodic' {
+  if (task.frequency === 'daily') return 'daily';
+
+  if (
+    task.frequency === 'monthly' ||
+    task.frequency === 'quarterly' ||
+    (task.frequency === 'custom' && (task.customDays ?? 0) >= 28)
+  ) {
+    return 'periodic';
+  }
+
+  return 'regular';
+}
+
+const TASK_GROUPS = [
+  { id: 'daily', title: 'Codzienne', description: 'Krótkie czynności utrzymujące porządek na bieżąco.' },
+  { id: 'regular', title: 'Regularne', description: 'Czynności powtarzane co kilka dni lub tygodni.' },
+  { id: 'periodic', title: 'Okresowe', description: 'Rzadsze porządki i czyszczenie sprzętów.' },
+] as const;
 
 function ChoiceButton({
   selected,
@@ -48,17 +96,25 @@ export function OnboardingScreen() {
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState<HomeProfile>(state.home);
   const [excluded, setExcluded] = useState<string[]>([]);
+  const [suggestedTasks, setSuggestedTasks] = useState<CleaningTask[]>([]);
   const [customTasks, setCustomTasks] = useState<CleaningTask[]>([]);
   const [customTitle, setCustomTitle] = useState('');
   const today = todayISO();
-  const dates = horizonDates(today);
 
-  const generated = useMemo(
-    () => (step === 6 ? buildPlanTasks(draft, today, excluded) : []),
-    [draft, excluded, step, today],
-  );
-  const previewTasks = useMemo(() => [...generated, ...customTasks], [generated, customTasks]);
-  const laterTasks = previewTasks.filter((task) => task.dueDate > dates[dates.length - 1]);
+  useEffect(() => {
+    if (step !== 6) return;
+
+    const allExcluded = Array.from(
+      new Set([
+        ...(state.excludedLibraryTaskIds ?? []),
+        ...excluded,
+      ]),
+    );
+
+    setSuggestedTasks(buildSuggestedTasks(draft, today, allExcluded));
+  }, [step, draft, today, excluded, state.excludedLibraryTaskIds]);
+
+  const previewTasks = [...suggestedTasks, ...customTasks];
 
   const patch = (partial: Partial<HomeProfile>) => setDraft((current) => ({ ...current, ...partial }));
 
@@ -74,12 +130,27 @@ export function OnboardingScreen() {
   const toggleAppliance = (id: ApplianceId) => toggleList('appliances', id);
   const toggleDayPart = (id: DayPart) => toggleList('dayParts', id);
 
+  const toggleCleaningDay = (day: number) => {
+  setDraft((current) => {
+    const selected = current.cleaningDays ?? [];
+
+    const next = selected.includes(day)
+      ? selected.filter((item) => item !== day)
+      : [...selected, day];
+
+    return {
+      ...current,
+      cleaningDays: next,
+    };
+  });
+};
+
   const canContinue =
     (step === 0 && draft.household !== null) ||
     (step === 1 && draft.smallChildren !== null) ||
     (step === 2 && draft.places.length > 0) ||
     (step === 3 && draft.timeBudget !== null) ||
-    (step === 4 && (draft.weekdays || draft.weekends) && draft.dayParts.length > 0) ||
+    (step === 4 && (draft.cleaningDays?.length ?? 0) > 0 && draft.dayParts.length > 0) ||
     (step === 5 && draft.style !== null) ||
     step === 6;
 
@@ -107,6 +178,53 @@ export function OnboardingScreen() {
     ]);
     setCustomTitle('');
   };
+
+  const updateTask = (taskId: string, changes: Partial<CleaningTask>) => {
+  setSuggestedTasks((current) =>
+    current.map((task) =>
+      task.id === taskId ? { ...task, ...changes } : task
+    )
+  );
+
+  setCustomTasks((current) =>
+    current.map((task) =>
+      task.id === taskId ? { ...task, ...changes } : task
+    )
+  );
+};
+
+const changeFrequency = (task: CleaningTask, value: string) => {
+  if (value === '2days' || value === '3days') {
+    updateTask(task.id, {
+      frequency: 'custom',
+      customDays: Number(value.replace('days', '')),
+    });
+    return;
+  }
+
+  updateTask(task.id, {
+    frequency: value as CleaningTask['frequency'],
+    customDays: null,
+  });
+};
+
+const removeTask = (task: CleaningTask) => {
+  if (task.libraryId) {
+    setExcluded((current) =>
+      current.includes(task.libraryId!)
+        ? current
+        : [...current, task.libraryId!]
+    );
+  }
+
+  setSuggestedTasks((current) =>
+    current.filter((item) => item.id !== task.id)
+  );
+
+  setCustomTasks((current) =>
+    current.filter((item) => item.id !== task.id)
+  );
+};
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -183,7 +301,9 @@ export function OnboardingScreen() {
         {step === 2 && (
           <section className="mt-5">
             <h1 className="text-2xl font-bold leading-tight text-ink-900">Jak wygląda Twój dom?</h1>
-            <p className="mt-2 text-sm leading-relaxed text-ink-600">Zaznacz pomieszczenia i sprzęty, które naprawdę masz.</p>
+            <p className="mt-2 text-sm leading-relaxed text-ink-600">
+  Zaznacz pomieszczenia i sprzęty, które naprawdę masz. Później możesz zmienić ten wybór, dodać własne pomieszczenia lub usunąć niepotrzebne.
+</p>
             <h2 className="mb-2 mt-6 text-sm font-bold text-ink-700">Pomieszczenia</h2>
             <div className="flex flex-col gap-2">
               {ROOMS.map((room) => (
@@ -233,30 +353,47 @@ export function OnboardingScreen() {
           <section className="mt-5">
             <h1 className="text-2xl font-bold leading-tight text-ink-900">Kiedy możesz sprzątać?</h1>
             <p className="mt-2 text-sm leading-relaxed text-ink-600">Zaznacz dni i pory, które zwykle Ci pasują.</p>
-            <h2 className="mb-2 mt-6 text-sm font-bold text-ink-700">Dni</h2>
-            <div className="flex flex-col gap-2">
-              <ChoiceButton
-                selected={draft.weekdays}
-                label="Dni robocze"
-                onClick={() => patch({ weekdays: !draft.weekdays })}
-              />
-              <ChoiceButton
-                selected={draft.weekends}
-                label="Weekendy"
-                onClick={() => patch({ weekends: !draft.weekends })}
-              />
-            </div>
-            <h2 className="mb-2 mt-6 text-sm font-bold text-ink-700">Pory</h2>
-            <div className="flex flex-col gap-2">
-              {DAY_PART_OPTIONS.map((option) => (
-                <ChoiceButton
-                  key={option.id}
-                  selected={draft.dayParts.includes(option.id)}
-                  label={option.label}
-                  onClick={() => toggleDayPart(option.id)}
-                />
-              ))}
-            </div>
+
+<h2 className="mb-2 mt-6 text-sm font-bold text-ink-700">
+  Dni, w które możesz sprzątać
+</h2>
+<p className="mb-3 text-sm leading-relaxed text-ink-500">
+  Wybierz dowolne dni tygodnia. Możesz zaznaczyć cały tydzień albo tylko te dni, które najbardziej Ci odpowiadają.
+</p>
+
+<div className="grid grid-cols-4 gap-2">
+  {CLEANING_DAY_OPTIONS.map((day) => {
+    const selected = (draft.cleaningDays ?? []).includes(day.id);
+
+    return (
+      <button
+        key={day.id}
+        type="button"
+        aria-pressed={selected}
+        onClick={() => toggleCleaningDay(day.id)}
+        className={`rounded-xl border px-2 py-3 text-sm font-semibold transition ${
+          selected
+            ? 'border-brand-600 bg-brand-50 text-brand-700'
+            : 'border-ink-200 bg-white text-ink-600 hover:border-ink-300'
+        }`}
+      >
+        {day.label}
+      </button>
+    );
+  })}
+</div>
+
+<h2 className="mb-2 mt-6 text-sm font-bold text-ink-700">Pory</h2>
+<div className="flex flex-col gap-2">
+  {DAY_PART_OPTIONS.map((option) => (
+    <ChoiceButton
+      key={option.id}
+      selected={draft.dayParts.includes(option.id)}
+      label={option.label}
+      onClick={() => toggleDayPart(option.id)}
+    />
+  ))}
+</div>
           </section>
         )}
 
@@ -277,94 +414,234 @@ export function OnboardingScreen() {
           </section>
         )}
 
-        {step === 6 && (
-          <section className="mt-5">
-            <h1 className="text-2xl font-bold leading-tight text-ink-900">Twój tydzień</h1>
-            <p className="mt-2 text-sm leading-relaxed text-ink-600">{planSubtitle(draft, today)}</p>
-            <p className="mt-2 text-sm leading-relaxed text-ink-500">
-              {formatPlanRange(today)}. To propozycja z Twoich odpowiedzi. Możesz ją zaakceptować albo zdjąć czynności, które nie
-              pasują.
-            </p>
-            {draft.specialNeeds.trim() && (
-              <p className="mt-3 rounded-2xl bg-sand-50 px-4 py-3 text-sm leading-relaxed text-sand-800">
-                Biorę pod uwagę: {draft.specialNeeds.trim()}
-              </p>
-            )}
-            <div className="mt-5">
-              <WeekBoard tasks={previewTasks} home={draft} today={today} dates={dates} />
-            </div>
 
-            <h2 className="mb-2 mt-6 text-sm font-bold text-ink-700">Czynności w planie</h2>
-            <ul className="flex flex-col gap-2">
-              {generated.map((task) => (
-                <li key={task.libraryId} className="flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 shadow-card">
-                  <span className="text-sm font-semibold text-ink-900">{task.title}</span>
-                  <button
-                    type="button"
-                    onClick={() => task.libraryId && setExcluded((current) => [...current, task.libraryId as string])}
-                    className="shrink-0 text-xs font-bold text-ink-500"
-                  >
-                    Usuń
-                  </button>
-                </li>
-              ))}
-              {customTasks.map((task) => (
-                <li key={task.id} className="flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 shadow-card">
-                  <span className="text-sm font-semibold text-ink-900">{task.title}</span>
-                  <button
-                    type="button"
-                    onClick={() => setCustomTasks((current) => current.filter((item) => item.id !== task.id))}
-                    className="shrink-0 text-xs font-bold text-ink-500"
-                  >
-                    Usuń
-                  </button>
-                </li>
-              ))}
-            </ul>
+{step === 6 && (
+  <section className="mt-5">
+    <h1 className="text-2xl font-bold leading-tight text-ink-900">
+      Jakie czynności uwzględnić w planie?
+    </h1>
 
-            {excluded.length > 0 && (
-              <div className="mt-4">
-                <h2 className="mb-2 text-sm font-bold text-ink-700">Zdjęte z planu</h2>
-                <div className="flex flex-wrap gap-2">
-                  {excluded.map((id) => (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => setExcluded((current) => current.filter((item) => item !== id))}
-                      className="rounded-full bg-ink-100 px-3 py-1.5 text-xs font-semibold text-ink-700"
+    <p className="mt-2 text-sm leading-relaxed text-ink-600">
+      Przygotowałam listę na podstawie informacji o Twoim domu.
+      Sprawdź propozycje, zmień nazwy lub częstotliwość i usuń
+      czynności, których nie potrzebujesz.
+    </p>
+
+    {TASK_GROUPS.map((group) => {
+      const groupTasks = previewTasks.filter(
+        (task) => getTaskGroup(task) === group.id
+      );
+
+      if (groupTasks.length === 0) return null;
+
+      return (
+        <div key={group.id} className="mt-7">
+          <h2 className="text-lg font-bold text-ink-900">
+            {group.title}
+          </h2>
+
+          <p className="mt-1 text-sm text-ink-500">
+            {group.description}
+          </p>
+
+          {ROOMS.filter((room) =>
+            groupTasks.some((task) => task.roomId === room.id)
+          ).map((room) => (
+            <div key={room.id} className="mt-4">
+              <h3 className="mb-2 text-sm font-bold text-ink-700">
+                {room.name}
+              </h3>
+
+              <div className="flex flex-col gap-2">
+                {groupTasks
+                  .filter((task) => task.roomId === room.id)
+                  .map((task) => (
+                    <div
+                      key={task.id}
+                      className="rounded-2xl border border-ink-200 bg-white p-3"
                     >
-                      Przywróć: {TASK_LIBRARY.find((item) => item.id === id)?.title ?? 'czynność'}
-                    </button>
+                      <div className="flex items-start gap-2">
+                        <input
+                          value={task.title}
+                          onChange={(event) =>
+                            updateTask(task.id, {
+                              title: event.target.value,
+                            })
+                          }
+                          aria-label="Nazwa czynności"
+                          className="min-w-0 flex-1 rounded-lg border border-ink-200 px-3 py-2 text-sm font-semibold text-ink-900 outline-none focus:border-brand-500"
+                        />
+
+                        <button
+                          type="button"
+                          onClick={() => removeTask(task)}
+                          className="shrink-0 rounded-lg px-2 py-2 text-xs font-bold text-ink-500"
+                        >
+                          Usuń
+                        </button>
+                      </div>
+
+                      <div className="mt-2">
+                        <label className="mb-1 block text-xs font-medium text-ink-500">
+                          Jak często?
+                        </label>
+
+                        <select
+                          value={getFrequencyValue(task)}
+                          onChange={(event) =>
+                            changeFrequency(task, event.target.value)
+                          }
+                          className="w-full rounded-xl border border-ink-200 bg-white px-3 py-2.5 text-sm text-ink-800 outline-none focus:border-brand-500"
+                        >
+                          {FREQUENCY_OPTIONS.map((option) => (
+                            <option
+                              key={option.value}
+                              value={option.value}
+                            >
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
                   ))}
-                </div>
               </div>
-            )}
+            </div>
+          ))}
 
-            {laterTasks.length > 0 && (
-              <p className="mt-4 text-sm leading-relaxed text-ink-500">
-                Rzadsze czynności, takie jak sprzęt AGD czy okna, dostały dalszy termin. Nie wchodzą wszystkie naraz w ten tydzień.
-              </p>
-            )}
+          {groupTasks.some(
+            (task) => !ROOMS.some((room) => room.id === task.roomId)
+          ) && (
+            <div className="mt-4">
+              <h3 className="mb-2 text-sm font-bold text-ink-700">
+                Pozostałe
+              </h3>
 
-            <form
-              className="mt-4 flex gap-2"
-              onSubmit={(event) => {
-                event.preventDefault();
-                addCustom();
-              }}
+              <div className="flex flex-col gap-2">
+                {groupTasks
+                  .filter(
+                    (task) => !ROOMS.some((room) => room.id === task.roomId)
+                  )
+                  .map((task) => (
+                    <div
+                      key={task.id}
+                      className="rounded-2xl border border-ink-200 bg-white p-3"
+                    >
+                      <input
+                        value={task.title}
+                        onChange={(event) =>
+                          updateTask(task.id, {
+                            title: event.target.value,
+                          })
+                        }
+                        aria-label="Nazwa czynności"
+                        className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm font-semibold text-ink-900"
+                      />
+
+                      <select
+                        value={getFrequencyValue(task)}
+                        onChange={(event) =>
+                          changeFrequency(task, event.target.value)
+                        }
+                        className="mt-2 w-full rounded-xl border border-ink-200 bg-white px-3 py-2.5 text-sm"
+                      >
+                        {FREQUENCY_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+
+                      <button
+                        type="button"
+                        onClick={() => removeTask(task)}
+                        className="mt-2 text-xs font-bold text-ink-500"
+                      >
+                        Usuń
+                      </button>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    })}
+
+    {previewTasks.length === 0 && (
+      <p className="mt-5 rounded-2xl bg-ink-100 p-4 text-sm text-ink-600">
+        Nie ma jeszcze żadnych czynności. Możesz dodać własne zadania poniżej.
+      </p>
+    )}
+
+    {excluded.length > 0 && (
+      <div className="mt-7">
+        <h2 className="text-sm font-bold text-ink-700">
+          Usunięte czynności
+        </h2>
+
+        <div className="mt-2 flex flex-col gap-2">
+          {excluded.map((id) => (
+            <div
+              key={id}
+              className="flex items-center justify-between gap-3 rounded-xl bg-ink-100 px-3 py-2"
             >
-              <input
-                value={customTitle}
-                onChange={(event) => setCustomTitle(event.target.value)}
-                placeholder="Własna czynność, np. przetrzeć drzwi"
-                className="min-w-0 flex-1 rounded-2xl border border-ink-200 bg-white px-4 py-3 text-sm outline-none focus:border-brand-500"
-              />
-              <button type="submit" className="rounded-2xl bg-ink-900 px-4 text-sm font-semibold text-white">
-                Dodaj
+              <span className="text-sm text-ink-700">
+                {TASK_LIBRARY.find((item) => item.id === id)?.title ?? 'Czynność'}
+              </span>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setExcluded((current) =>
+                    current.filter((item) => item !== id)
+                  )
+                }
+                className="shrink-0 text-xs font-bold text-brand-700"
+              >
+                Przywróć
               </button>
-            </form>
-          </section>
-        )}
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+
+    <div className="mt-7 rounded-2xl border border-dashed border-ink-300 p-3">
+      <h2 className="text-sm font-bold text-ink-800">
+        Dodaj własną czynność
+      </h2>
+
+      <form
+        className="mt-3 flex gap-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          addCustom();
+        }}
+      >
+        <input
+          value={customTitle}
+          onChange={(event) => setCustomTitle(event.target.value)}
+          placeholder="Np. czyszczenie drzwi"
+          className="min-w-0 flex-1 rounded-xl border border-ink-200 bg-white px-3 py-3 text-sm outline-none focus:border-brand-500"
+        />
+
+        <button
+          type="submit"
+          disabled={!customTitle.trim()}
+          className="rounded-xl bg-ink-900 px-4 text-sm font-semibold text-white disabled:bg-ink-300"
+        >
+          Dodaj
+        </button>
+      </form>
+    </div>
+
+    <p className="mt-5 text-xs leading-relaxed text-ink-500">
+      Po sprawdzeniu listy przejdziesz do układania harmonogramu.
+    </p>
+  </section>
+)}
+
       </div>
 
       <div className="border-t border-ink-200 bg-white px-5 py-4 pb-[max(env(safe-area-inset-bottom),16px)]">

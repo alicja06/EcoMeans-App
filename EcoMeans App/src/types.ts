@@ -12,13 +12,24 @@ export type RoomId =
 
 export type Frequency = 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'custom';
 
-export type HouseholdSize = 'alone' | 'partner' | 'several' | 'family';
+export type HouseholdSize =
+  | 'alone'
+  | 'one-other'
+  | 'several'
+  | 'partner'
+  | 'family';
 
 export type TimeBudget = 'm10' | 'm20' | 'few-days' | 'one-day' | 'flexible';
 
 export type DayPart = 'morning' | 'afternoon' | 'evening';
 
-export type ScheduleStyle = 'spread' | 'block' | 'mix' | 'auto';
+export type ScheduleStyle =
+  | 'rooms'
+  | 'tasks'
+  | 'auto'
+  | 'spread'
+  | 'block'
+  | 'mix';
 
 export type ApplianceId =
   | 'washer'
@@ -71,6 +82,7 @@ export interface HomeProfile {
   timeBudget: TimeBudget | null;
   weekdays: boolean;
   weekends: boolean;
+  cleaningDays?: number[];
   dayParts: DayPart[];
   style: ScheduleStyle | null;
   onboardingComplete: boolean;
@@ -106,6 +118,7 @@ export interface Profile {
 
 export interface AppState {
   tasks: CleaningTask[];
+  excludedLibraryTaskIds?: string[];
   history: HistoryEntry[];
   favoriteProductIds: string[];
   savedTipIds: string[];

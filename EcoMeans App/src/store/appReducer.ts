@@ -112,8 +112,24 @@ export function appReducer(state: AppState, action: AppAction): AppState {
           task.id === action.taskId ? { ...task, dueDate: addDays(action.today, 1), previousDueDate: null } : task,
         ),
       };
-    case 'deleteTask':
-      return { ...state, tasks: state.tasks.filter((task) => task.id !== action.taskId) };
+case 'deleteTask': {
+  const taskToDelete = state.tasks.find((task) => task.id === action.taskId);
+
+  const excludedLibraryTaskIds = taskToDelete?.libraryId
+    ? Array.from(
+        new Set([
+          ...(state.excludedLibraryTaskIds ?? []),
+          taskToDelete.libraryId,
+        ])
+      )
+    : state.excludedLibraryTaskIds ?? [];
+
+  return {
+    ...state,
+    tasks: state.tasks.filter((task) => task.id !== action.taskId),
+    excludedLibraryTaskIds,
+  };
+}
     case 'toggleFavorite':
       return { ...state, favoriteProductIds: toggleInList(state.favoriteProductIds, action.productId) };
     case 'toggleSavedTip':
@@ -135,19 +151,44 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, profile: { ...state.profile, ...action.patch } };
     case 'updateHome':
       return { ...state, home: { ...state.home, ...action.patch } };
-    case 'acceptPlan': {
-      const kept = state.tasks.filter((task) => {
-        if (task.source !== 'user') return false;
-        if (task.libraryId && action.tasks.some((item) => item.libraryId === task.libraryId)) return false;
-        return true;
-      });
+case 'acceptPlan': {
+  const excludedIds = new Set(state.excludedLibraryTaskIds ?? []);
+
+  const existingLibraryTasks = new Map(
+    state.tasks
+      .filter((task) => task.libraryId)
+      .map((task) => [task.libraryId!, task]),
+  );
+
+  const plannedTasks = action.tasks
+    .filter((task) => !task.libraryId || !excludedIds.has(task.libraryId))
+    .map((task) => {
+      if (!task.libraryId) return task;
+
+      const existingTask = existingLibraryTasks.get(task.libraryId);
+
+      if (!existingTask) return task;
+
       return {
-        ...state,
-        tasks: [...action.tasks, ...kept],
-        home: { ...action.home, onboardingComplete: true },
-        profile: { ...state.profile, cleaningDay: action.cleaningDay },
+        ...task,
+        ...existingTask,
+        id: existingTask.id,
       };
-    }
+    });
+
+  const plannedTaskIds = new Set(plannedTasks.map((task) => task.id));
+
+  const existingCustomTasks = state.tasks.filter(
+    (task) => !task.libraryId && !plannedTaskIds.has(task.id),
+  );
+
+  return {
+    ...state,
+    tasks: [...plannedTasks, ...existingCustomTasks],
+    home: { ...action.home, onboardingComplete: true },
+    profile: { ...state.profile, cleaningDay: action.cleaningDay },
+  };
+}
     case 'reset':
       return action.state;
   }
