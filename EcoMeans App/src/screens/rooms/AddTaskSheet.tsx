@@ -21,6 +21,7 @@ export function AddTaskSheet({ roomId, onClose }: AddTaskSheetProps) {
   const [title, setTitle] = useState('');
   const [frequency, setFrequency] = useState<Frequency>('weekly');
   const [customInput, setCustomInput] = useState('7');
+  const [minutes, setMinutes] = useState('15');
   const [error, setError] = useState<string | null>(null);
 
   const roomTitles = state.tasks.filter((task) => task.roomId === roomId).map((task) => task.title.toLowerCase());
@@ -46,7 +47,12 @@ export function AddTaskSheet({ roomId, onClose }: AddTaskSheetProps) {
       }
       customDays = days;
     }
-    addTask({ roomId, title: trimmed, frequency, customDays, startDate: todayISO() });
+    const parsedMinutes = Number(minutes);
+    if (!Number.isInteger(parsedMinutes) || parsedMinutes < 1 || parsedMinutes > 240) {
+      setError('Czas podaj w minutach, od 1 do 240.');
+      return;
+    }
+    addTask({ roomId, title: trimmed, frequency, customDays, startDate: todayISO(), minutes: parsedMinutes });
     showToast(`Dodano: ${trimmed}`);
     onClose();
   };
@@ -101,6 +107,21 @@ export function AddTaskSheet({ roomId, onClose }: AddTaskSheetProps) {
             </div>
           </div>
         )}
+
+        <label className="flex flex-col gap-2">
+          <span className="text-sm font-semibold text-ink-700">Szacowany czas (minuty)</span>
+          <input
+            type="number"
+            min={1}
+            max={240}
+            value={minutes}
+            onChange={(event) => {
+              setMinutes(event.target.value);
+              setError(null);
+            }}
+            className={INPUT_CLASS}
+          />
+        </label>
 
         <div className="flex flex-col gap-2">
           <span className="text-sm font-semibold text-ink-700">Jak często?</span>

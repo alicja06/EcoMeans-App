@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Bell, ChevronRight, Info, Shield, Trash2, User } from 'lucide-react';
 import { WEEKDAY_NAMES } from '@/lib/dates';
+import { dayPartsLabel, householdLabel, timeBudgetLabel } from '@/data/home';
 import { useAppStore } from '@/store/AppStoreContext';
 import { useNavigation } from '@/store/NavigationContext';
 import { useToast } from '@/store/ToastContext';
@@ -11,7 +12,7 @@ import { PRODUCTS } from '@/data/products';
 import { TIPS } from '@/data/tips';
 
 export function ProfileScreen() {
-  const { state, updateProfile, resetState } = useAppStore();
+  const { state, updateProfile, updateHome, resetState } = useAppStore();
   const { navigate } = useNavigation();
   const { showToast } = useToast();
   const [nameDraft, setNameDraft] = useState(state.profile.name);
@@ -55,6 +56,26 @@ export function ProfileScreen() {
               Zapisz
             </button>
           </form>
+        </section>
+
+        <section>
+          <h2 className="mb-3 text-sm font-bold text-ink-700">Twój dom</h2>
+          <div className="rounded-3xl bg-white p-4 shadow-card">
+            <p className="font-semibold text-ink-900">{householdLabel(state.home.household)}</p>
+            <p className="mt-1 text-sm text-ink-500">
+              {timeBudgetLabel(state.home.timeBudget)} · {dayPartsLabel(state.home.dayParts)}
+            </p>
+            <p className="mt-1 text-sm text-ink-500">
+              Pomieszczenia: {state.home.places.length || 'brak'} · Urządzenia: {state.home.appliances.length || 'brak'}
+            </p>
+            <button
+              type="button"
+              onClick={() => updateHome({ onboardingComplete: false })}
+              className="mt-4 w-full rounded-2xl bg-brand-50 py-3 text-sm font-bold text-brand-800"
+            >
+              Ułóż plan od nowa
+            </button>
+          </div>
         </section>
 
         <section>

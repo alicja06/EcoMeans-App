@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ListPlus, Plus, Trash2 } from 'lucide-react';
+import { ListPlus, Plus, SlidersHorizontal } from 'lucide-react';
+import type { CleaningTask, RoomId } from '@/types';
 import { findRoom } from '@/data/rooms';
 import { ROOM_ICONS } from '@/components/icons/categoryIcons';
 import { useAppStore } from '@/store/AppStoreContext';
@@ -7,17 +8,18 @@ import { useToast } from '@/store/ToastContext';
 import { useNavigation } from '@/store/NavigationContext';
 import { todayISO } from '@/lib/dates';
 import { compareByDueDate, isDoneToday } from '@/lib/tasks';
-import type { RoomId } from '@/types';
 import { ScreenHeader } from '@/components/layout/ScreenHeader';
 import { EmptyState } from '@/components/ui/controls';
 import { TaskRow } from '@/components/tasks/TaskRow';
 import { AddTaskSheet } from '@/screens/rooms/AddTaskSheet';
+import { TaskSettingsSheet } from '@/components/tasks/TaskSettingsSheet';
 
 export function RoomDetailScreen({ roomId }: { roomId: RoomId }) {
-  const { state, toggleTaskDone, deleteTask } = useAppStore();
+  const { state, toggleTaskDone } = useAppStore();
   const { goBack } = useNavigation();
   const { showToast } = useToast();
   const [adding, setAdding] = useState(false);
+  const [selected, setSelected] = useState<CleaningTask | null>(null);
   const today = todayISO();
   const room = findRoom(roomId);
 
@@ -33,7 +35,8 @@ export function RoomDetailScreen({ roomId }: { roomId: RoomId }) {
   }
 
   const Icon = ROOM_ICONS[roomId];
-  const tasks = state.tasks.filter((task) => task.roomId === roomId).sort(compareByDueDate);
+  const tasks = state.tasks.filter((task) => task.roomId === roomId && task.enabled).sort(compareByDueDate);
+  const paused = state.tasks.filter((task) => task.roomId === roomId && !task.enabled);
   const doneCount = tasks.filter((task) => isDoneToday(task, today)).length;
 
   return (
@@ -83,14 +86,11 @@ export function RoomDetailScreen({ roomId }: { roomId: RoomId }) {
                   trailing={
                     <button
                       type="button"
-                      onClick={() => {
-                        deleteTask(task.id);
-                        showToast('Usunięto zadanie');
-                      }}
-                      aria-label={`Usuń zadanie: ${task.title}`}
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-400 transition hover:bg-danger-50 hover:text-danger-700"
+                      onClick={() => setSelected(task)}
+                      aria-label={`Ustawienia: ${task.title}`}
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-400 transition hover:bg-ink-100 hover:text-ink-700"
                     >
-                      <Trash2 size={16} />
+                      <SlidersHorizontal size={16} />
                     </button>
                   }
                 />
@@ -98,9 +98,29 @@ export function RoomDetailScreen({ roomId }: { roomId: RoomId }) {
             })}
           </ul>
         )}
+
+        {paused.length > 0 && (
+          <section>
+            <h2 className="mb-2 text-sm font-bold text-ink-700">Wyłączone</h2>
+            <ul className="flex flex-col gap-2">
+              {paused.map((task) => (
+                <li key={task.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSelected(task)}
+                    className="w-full rounded-2xl bg-white px-4 py-3 text-left text-sm font-semibold text-ink-500 shadow-card"
+                  >
+                    {task.title}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
       </div>
 
       {adding && <AddTaskSheet roomId={roomId} onClose={() => setAdding(false)} />}
+      {selected && <TaskSettingsSheet task={selected} onClose={() => setSelected(null)} />}
     </>
   );
 }

@@ -11,6 +11,7 @@ import { TipDetailScreen } from '@/screens/tips/TipDetailScreen';
 import { ShoppingListScreen } from '@/screens/shopping/ShoppingListScreen';
 import { ProfileScreen } from '@/screens/profile/ProfileScreen';
 import { PrivacyScreen } from '@/screens/profile/PrivacyScreen';
+import { WeekPlanScreen } from '@/screens/plan/WeekPlanScreen';
 import type { Route } from '@/types';
 
 function renderRoute(route: Route) {
@@ -37,6 +38,8 @@ function renderRoute(route: Route) {
       return <ProfileScreen />;
     case 'privacy':
       return <PrivacyScreen />;
+    case 'plan':
+      return <WeekPlanScreen />;
   }
 }
 

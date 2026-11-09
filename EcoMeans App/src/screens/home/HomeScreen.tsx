@@ -1,10 +1,14 @@
-import { CalendarDays, ChevronRight, ShoppingCart, Sparkles } from 'lucide-react';
+import { useState } from 'react';
+import { CalendarDays, ChevronRight, ShoppingCart, SlidersHorizontal, Sparkles } from 'lucide-react';
+import type { CleaningTask } from '@/types';
 import { useAppStore } from '@/store/AppStoreContext';
 import { useNavigation } from '@/store/NavigationContext';
 import { useToast } from '@/store/ToastContext';
 import { formatFullDate, todayISO } from '@/lib/dates';
-import { compareByDueDate, isDoneToday, isOnToday } from '@/lib/tasks';
+import { isDoneToday } from '@/lib/tasks';
+import { isScheduledOn, resolveCalendar } from '@/lib/schedule';
 import { TaskRow } from '@/components/tasks/TaskRow';
+import { TaskSettingsSheet } from '@/components/tasks/TaskSettingsSheet';
 import { ProgressBar } from '@/components/ui/controls';
 import { ProductImage } from '@/components/ui/ProductImage';
 import { PRODUCTS } from '@/data/products';
@@ -12,17 +16,22 @@ import { TIPS } from '@/data/tips';
 
 export function HomeScreen() {
   const { state, toggleTaskDone } = useAppStore();
-  const { navigate, resetTo } = useNavigation();
+  const { navigate } = useNavigation();
   const { showToast } = useToast();
+  const [selected, setSelected] = useState<CleaningTask | null>(null);
 
   const today = todayISO();
   const dayIndex = Number(today.replace(/-/g, ''));
   const tip = TIPS[dayIndex % TIPS.length];
   const product = PRODUCTS[dayIndex % PRODUCTS.length];
 
+  const calendar = resolveCalendar(state.home);
   const todayTasks = state.tasks
-    .filter((task) => isOnToday(task, today))
-    .sort((a, b) => Number(isDoneToday(a, today)) - Number(isDoneToday(b, today)) || compareByDueDate(a, b));
+    .filter((task) => task.enabled && (isScheduledOn(task, today, calendar) || isDoneToday(task, today)))
+    .sort((a, b) => Number(isDoneToday(a, today)) - Number(isDoneToday(b, today)));
+  const carried = state.tasks.filter(
+    (task) => task.enabled && task.dueDate < today && !isScheduledOn(task, today, calendar) && !isDoneToday(task, today),
+  );
   const doneCount = todayTasks.filter((task) => isDoneToday(task, today)).length;
   const name = state.profile.name.trim();
   const openShopping = state.shoppingItems.filter((item) => !item.bought).length;
@@ -81,16 +90,66 @@ export function HomeScreen() {
           <ul className="flex flex-col gap-3">
             {todayTasks.map((task) => {
               const done = isDoneToday(task, today);
-              return <TaskRow key={task.id} task={task} today={today} done={done} onToggle={() => handleToggle(task.id, done)} />;
+              return (
+                <TaskRow
+                  key={task.id}
+                  task={task}
+                  today={today}
+                  done={done}
+                  whenLabel={done ? 'Zrobione' : 'Na dziś'}
+                  onToggle={() => handleToggle(task.id, done)}
+                  trailing={
+                    <button
+                      type="button"
+                      aria-label={`Ustawienia: ${task.title}`}
+                      onClick={() => setSelected(task)}
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-400 hover:bg-ink-100 hover:text-ink-700"
+                    >
+                      <SlidersHorizontal size={16} />
+                    </button>
+                  }
+                />
+              );
             })}
           </ul>
         )}
       </section>
 
+      {carried.length > 0 && (
+        <section className="mt-7">
+          <h2 className="mb-1 text-lg font-bold text-ink-900">Z poprzednich dni</h2>
+          <p className="mb-3 text-sm leading-relaxed text-ink-500">
+            Nic się nie dzieje, jeśli zostawisz je na później. Możesz je przesunąć, pominąć albo zmienić częstotliwość.
+          </p>
+          <ul className="flex flex-col gap-3">
+            {carried.map((task) => (
+              <TaskRow
+                key={task.id}
+                task={task}
+                today={today}
+                done={false}
+                whenLabel="Kiedy pasuje"
+                onToggle={() => handleToggle(task.id, false)}
+                trailing={
+                  <button
+                    type="button"
+                    aria-label={`Ustawienia: ${task.title}`}
+                    onClick={() => setSelected(task)}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-400 hover:bg-ink-100 hover:text-ink-700"
+                  >
+                    <SlidersHorizontal size={16} />
+                  </button>
+                }
+              />
+            ))}
+          </ul>
+        </section>
+      )}
+
       <section className="mt-7 grid grid-cols-2 gap-3">
         <button
           type="button"
-          onClick={() => resetTo({ name: 'rooms' })}
+          onClick={() => navigate({ name: 'plan' })}
           className="flex flex-col items-start gap-3 rounded-3xl bg-white p-4 text-left shadow-card transition active:scale-[0.98]"
         >
           <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sage-100 text-sage-700">
@@ -140,6 +199,7 @@ export function HomeScreen() {
           </div>
         </button>
       </section>
+      {selected && <TaskSettingsSheet task={selected} onClose={() => setSelected(null)} />}
     </div>
   );
 }

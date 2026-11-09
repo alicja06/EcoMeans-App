@@ -1,6 +1,36 @@
-export type RoomId = 'kitchen' | 'bathroom' | 'living' | 'bedroom' | 'hallway' | 'other';
+export type RoomId =
+  | 'kitchen'
+  | 'bathroom'
+  | 'toilet'
+  | 'living'
+  | 'bedroom'
+  | 'hallway'
+  | 'kids'
+  | 'utility'
+  | 'balcony'
+  | 'other';
 
 export type Frequency = 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'custom';
+
+export type HouseholdSize = 'alone' | 'partner' | 'several' | 'family';
+
+export type TimeBudget = 'm10' | 'm20' | 'few-days' | 'one-day' | 'flexible';
+
+export type DayPart = 'morning' | 'afternoon' | 'evening';
+
+export type ScheduleStyle = 'spread' | 'block' | 'mix' | 'auto';
+
+export type ApplianceId =
+  | 'washer'
+  | 'dishwasher'
+  | 'oven'
+  | 'fridge'
+  | 'hood'
+  | 'coffee'
+  | 'vacuum'
+  | 'aircon';
+
+export type TaskSource = 'plan' | 'user';
 
 export type ProductCategoryId = 'kitchen' | 'bathroom' | 'floors' | 'dishes';
 
@@ -24,6 +54,26 @@ export interface CleaningTask {
   dueDate: string;
   lastDoneDate: string | null;
   previousDueDate: string | null;
+  minutes: number;
+  enabled: boolean;
+  libraryId: string | null;
+  scheduleNote: string | null;
+  source: TaskSource;
+}
+
+export interface HomeProfile {
+  household: HouseholdSize | null;
+  smallChildren: boolean | null;
+  pets: string;
+  specialNeeds: string;
+  places: RoomId[];
+  appliances: ApplianceId[];
+  timeBudget: TimeBudget | null;
+  weekdays: boolean;
+  weekends: boolean;
+  dayParts: DayPart[];
+  style: ScheduleStyle | null;
+  onboardingComplete: boolean;
 }
 
 export interface HistoryEntry {
@@ -61,6 +111,7 @@ export interface AppState {
   savedTipIds: string[];
   shoppingItems: ShoppingItem[];
   profile: Profile;
+  home: HomeProfile;
 }
 
 export interface ProductCategory {
@@ -108,4 +159,5 @@ export type Route =
   | { name: 'tip'; tipId: string }
   | { name: 'shopping' }
   | { name: 'profile' }
-  | { name: 'privacy' };
+  | { name: 'privacy' }
+  | { name: 'plan' };
