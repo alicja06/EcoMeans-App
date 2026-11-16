@@ -1,6 +1,7 @@
 import type { AppState, CleaningTask, HistoryEntry, HomeProfile, Profile, ShoppingItem } from '@/types';
 import { addDays } from '@/lib/dates';
 import { nextScheduledDate } from '@/lib/schedule';
+import { nextDueAfterDone } from '@/lib/tasks';
 
 export type AppAction =
   | { type: 'toggleTaskDone'; taskId: string; today: string; historyId: string }
@@ -66,7 +67,15 @@ function toggleTaskDone(state: AppState, action: Extract<AppAction, { type: 'tog
             ...item,
             lastDoneDate: action.today,
             previousDueDate: item.dueDate,
-            dueDate: nextScheduledDate(action.today, item.frequency, item.customDays, state.home),
+            dueDate: item.frequency === 'custom' && item.customRule
+  ? nextDueAfterDone(
+      item.frequency,
+      item.customDays,
+      action.today,
+      item.customRule,
+      item.dueDate,
+    )
+  : nextScheduledDate(action.today, item.frequency, item.customDays, state.home),
           }
         : item,
     ),
@@ -100,7 +109,15 @@ export function appReducer(state: AppState, action: AppAction): AppState {
           const base = task.dueDate > action.today ? task.dueDate : action.today;
           return {
             ...task,
-            dueDate: nextScheduledDate(base, task.frequency, task.customDays, state.home),
+            dueDate: task.frequency === 'custom' && task.customRule
+  ? nextDueAfterDone(
+      task.frequency,
+      task.customDays,
+      base,
+      task.customRule,
+      task.dueDate,
+    )
+  : nextScheduledDate(base, task.frequency, task.customDays, state.home),
             previousDueDate: null,
           };
         }),

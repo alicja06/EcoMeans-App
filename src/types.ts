@@ -12,6 +12,35 @@ export type RoomId =
 
 export type Frequency = 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'custom';
 
+export type CustomFrequencyUnit = 'days' | 'weeks' | 'months';
+
+export type MonthlyFrequencyPattern =
+  | {
+      type: 'dayOfMonth';
+      day: number;
+    }
+  | {
+      type: 'weekdayOrdinal';
+      ordinal: 1 | 2 | 3 | 4 | -1;
+      weekday: number;
+    };
+
+export type CustomFrequencyRule =
+  | {
+      unit: 'days';
+      interval: number;
+    }
+  | {
+      unit: 'weeks';
+      interval: number;
+      weekdays: number[];
+    }
+  | {
+      unit: 'months';
+      interval: number;
+      monthlyPattern: MonthlyFrequencyPattern;
+    };
+
 export type HouseholdSize =
   | 'alone'
   | 'one-other'
@@ -62,6 +91,7 @@ export interface CleaningTask {
   title: string;
   frequency: Frequency;
   customDays: number | null;
+  customRule?: CustomFrequencyRule | null;
   dueDate: string;
   lastDoneDate: string | null;
   previousDueDate: string | null;
