@@ -203,7 +203,6 @@ case 'acceptPlan': {
     ...state,
     tasks: [...plannedTasks, ...existingCustomTasks],
     home: { ...action.home, onboardingComplete: true },
-    profile: { ...state.profile, cleaningDay: action.cleaningDay },
   };
 }
     case 'reset':

@@ -10,7 +10,6 @@ export function createInitialState(_today: string): AppState {
     shoppingItems: [],
     profile: {
       name: '',
-      cleaningDay: 6,
       notifications: { reminders: true, dailySummary: false, newTips: false },
     },
     home: emptyHome(),

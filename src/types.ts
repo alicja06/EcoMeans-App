@@ -99,6 +99,7 @@ export interface CleaningTask {
   enabled: boolean;
   libraryId: string | null;
   scheduleNote: string | null;
+  assignedTo?: string | null;
   source: TaskSource;
 }
 
@@ -125,6 +126,7 @@ export interface HistoryEntry {
   roomId: RoomId;
   doneDate: string;
   doneAt: number;
+  completedBy?: string | null;
 }
 
 export interface ShoppingItem {
@@ -142,7 +144,6 @@ export interface NotificationSettings {
 
 export interface Profile {
   name: string;
-  cleaningDay: number;
   notifications: NotificationSettings;
 }
 

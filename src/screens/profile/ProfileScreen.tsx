@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Bell, ChevronRight, Info, Shield, Trash2, User } from 'lucide-react';
-import { WEEKDAY_NAMES } from '@/lib/dates';
-import { dayPartsLabel, householdLabel, timeBudgetLabel } from '@/data/home';
+import { dayPartsLabel, timeBudgetLabel } from '@/data/home';
 import { useAppStore } from '@/store/AppStoreContext';
 import { useNavigation } from '@/store/NavigationContext';
 import { useToast } from '@/store/ToastContext';
@@ -59,9 +58,8 @@ export function ProfileScreen() {
         </section>
 
         <section>
-          <h2 className="mb-3 text-sm font-bold text-ink-700">Twój dom</h2>
+          <h2 className="mb-3 text-sm font-bold text-ink-700">Twój harmonogram sprzątania</h2>
           <div className="rounded-3xl bg-white p-4 shadow-card">
-            <p className="font-semibold text-ink-900">{householdLabel(state.home.household)}</p>
             <p className="mt-1 text-sm text-ink-500">
               {timeBudgetLabel(state.home.timeBudget)} · {dayPartsLabel(state.home.dayParts)}
             </p>
@@ -73,28 +71,8 @@ export function ProfileScreen() {
               onClick={() => updateHome({ onboardingComplete: false })}
               className="mt-4 w-full rounded-2xl bg-brand-50 py-3 text-sm font-bold text-brand-800"
             >
-              Ułóż plan od nowa
+              Edytuj plan
             </button>
-          </div>
-        </section>
-
-        <section>
-          <h2 className="mb-3 text-sm font-bold text-ink-700">Preferencje sprzątania</h2>
-          <div className="rounded-3xl bg-white p-4 shadow-card">
-            <label className="flex items-center justify-between gap-4">
-              <span className="font-semibold text-ink-900">Generalne sprzątanie</span>
-              <select
-                value={state.profile.cleaningDay}
-                onChange={(event) => updateProfile({ cleaningDay: Number(event.target.value) })}
-                className="rounded-xl border border-ink-200 bg-white px-3 py-2 text-sm font-semibold text-ink-800 outline-none"
-              >
-                {WEEKDAY_NAMES.map((day, index) => (
-                  <option key={day} value={index}>
-                    {day[0].toUpperCase() + day.slice(1)}
-                  </option>
-                ))}
-              </select>
-            </label>
           </div>
         </section>
 

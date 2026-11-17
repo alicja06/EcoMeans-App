@@ -1,3 +1,36 @@
+
+@font-face {
+  font-family: 'Caveat Brush';
+  src: url('/fonts/CaveatBrush-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Sen';
+  src: url('/fonts/Sen-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Sen';
+  src: url('/fonts/Sen-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Sen';
+  src: url('/fonts/Sen-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -10,8 +43,19 @@
   }
 
   body {
-    @apply bg-ink-100 font-sans text-ink-900 antialiased;
+    @apply bg-ink-100 text-ink-900 antialiased;
+    font-family: 'Sen', sans-serif;
     -webkit-tap-highlight-color: transparent;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  .font-heading {
+    font-family: 'Caveat Brush', cursive;
   }
 
   button,
