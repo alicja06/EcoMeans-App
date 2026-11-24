@@ -65,7 +65,7 @@ export function ProfileScreen() {
         </section>
 
         <section>
-          <h2 className="mb-3 text-sm font-bold text-ink-700">
+          <h2 className="mb-3 text-lg font-bold text-ink-700">
             Twój harmonogram sprzątania
           </h2>
           <div className="rounded-3xl bg-white p-4 shadow-card">
@@ -88,7 +88,7 @@ export function ProfileScreen() {
         </section>
 
         <section>
-          <h2 className="mb-3 text-sm font-bold text-ink-700">Powiadomienia</h2>
+          <h2 className="mb-3 text-lg font-bold text-ink-700">Powiadomienia</h2>
           <div className="flex flex-col gap-1 rounded-3xl bg-white p-4 shadow-card">
             {(
               [

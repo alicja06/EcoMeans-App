@@ -11,7 +11,6 @@ export function AuthScreen({ onAuthenticated, onBack }: AuthScreenProps) {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -27,11 +26,6 @@ export function AuthScreen({ onAuthenticated, onBack }: AuthScreenProps) {
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
-          options: {
-            data: {
-              full_name: name.trim(),
-            },
-          },
         });
 
         if (error) throw error;
@@ -129,20 +123,6 @@ export function AuthScreen({ onAuthenticated, onBack }: AuthScreenProps) {
           onSubmit={handleSubmit}
           className="space-y-4 rounded-3xl bg-white/80 p-6 shadow-sm"
         >
-          {mode === 'register' && (
-            <label className="block text-sm font-medium text-[#4e4d4d]">
-              Imię
-              <input
-                type="text"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                required
-                autoComplete="name"
-                className="mt-2 w-full rounded-xl border border-[#d9d0bd] bg-white px-4 py-3 outline-none focus:border-[#3b742f]"
-                placeholder="Jak mamy się do Ciebie zwracać?"
-              />
-            </label>
-          )}
 
           <label className="block text-sm font-medium text-[#4e4d4d]">
             Adres e-mail
