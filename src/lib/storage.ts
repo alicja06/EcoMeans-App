@@ -1,7 +1,6 @@
 
 import type { AppState, CleaningTask, HomeProfile, TaskSource } from '@/types';
 import { createInitialState } from '@/data/initialState';
-import { todayISO } from '@/lib/dates';
 
 const STORAGE_KEY_PREFIX = 'ecomeans-household-state-v1';
 
@@ -77,7 +76,7 @@ export function loadState(householdId: string): AppState | null {
       return null;
     }
 
-    const base = createInitialState(todayISO());
+    const base = createInitialState();
 
     const tasks = parsed.tasks
       .map((task, index) => normalizeTask(task, index))

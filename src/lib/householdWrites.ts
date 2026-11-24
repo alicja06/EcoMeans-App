@@ -1,10 +1,5 @@
-
-import type {
-  CleaningTask,
-  HomeProfile,
-  ShoppingItem,
-} from '@/types';
-import { supabase } from '@/lib/supabase';
+import type { CleaningTask, HomeProfile, ShoppingItem } from "@/types";
+import { supabase } from "@/lib/supabase";
 
 interface RpcResult {
   status: string;
@@ -25,7 +20,7 @@ async function runRpc(
     throw error;
   }
 
-  if (!data || typeof data !== 'object') {
+  if (!data || typeof data !== "object") {
     throw new Error(`Nieprawidłowa odpowiedź funkcji ${name}.`);
   }
 
@@ -57,7 +52,7 @@ export async function saveHouseholdTask(
   task: CleaningTask,
   expectedVersion: number | null,
 ): Promise<RpcResult> {
-  return runRpc('save_household_task', {
+  return runRpc("save_household_task", {
     p_household_id: householdId,
     p_client_id: task.id,
     p_expected_version: expectedVersion,
@@ -70,7 +65,7 @@ export async function deleteHouseholdTask(
   clientId: string,
   expectedVersion: number,
 ): Promise<RpcResult> {
-  return runRpc('delete_household_task', {
+  return runRpc("delete_household_task", {
     p_household_id: householdId,
     p_client_id: clientId,
     p_expected_version: expectedVersion,
@@ -82,7 +77,7 @@ export async function saveShoppingItem(
   item: ShoppingItem,
   expectedVersion: number | null,
 ): Promise<RpcResult> {
-  return runRpc('save_shopping_item', {
+  return runRpc("save_shopping_item", {
     p_household_id: householdId,
     p_client_id: item.id,
     p_expected_version: expectedVersion,
@@ -99,7 +94,7 @@ export async function deleteShoppingItem(
   clientId: string,
   expectedVersion: number,
 ): Promise<RpcResult> {
-  return runRpc('delete_shopping_item', {
+  return runRpc("delete_shopping_item", {
     p_household_id: householdId,
     p_client_id: clientId,
     p_expected_version: expectedVersion,
@@ -109,7 +104,7 @@ export async function deleteShoppingItem(
 export async function clearBoughtShoppingItems(
   householdId: string,
 ): Promise<RpcResult> {
-  return runRpc('clear_bought_shopping_items', {
+  return runRpc("clear_bought_shopping_items", {
     p_household_id: householdId,
   });
 }
@@ -120,7 +115,7 @@ export async function updateHouseholdSettings(
   home: HomeProfile,
   excludedLibraryTaskIds: string[],
 ): Promise<RpcResult> {
-  return runRpc('update_household_settings', {
+  return runRpc("update_household_settings", {
     p_household_id: householdId,
     p_expected_version: expectedVersion,
     p_home_profile: home,
@@ -138,7 +133,7 @@ export async function setTaskCompletion(params: {
   previousDueDate?: string | null;
   undo?: boolean;
 }): Promise<RpcResult> {
-  return runRpc('set_task_completion', {
+  return runRpc("set_task_completion", {
     p_household_id: params.householdId,
     p_task_client_id: params.taskClientId,
     p_expected_version: params.expectedVersion,
@@ -150,7 +145,6 @@ export async function setTaskCompletion(params: {
   });
 }
 
-
 export async function applyHouseholdPlan(
   householdId: string,
   expectedVersion: number,
@@ -158,11 +152,8 @@ export async function applyHouseholdPlan(
   excludedLibraryTaskIds: string[],
   tasks: CleaningTask[],
 ): Promise<RpcResult> {
-  const planTasks = tasks.filter(
-    (task) => task.source === 'plan',
-  );
-
-  return runRpc('apply_household_plan', {
+  const planTasks = tasks.filter((task) => task.source === "plan");
+  return runRpc("apply_household_plan", {
     p_household_id: householdId,
     p_expected_version: expectedVersion,
     p_home_profile: home,

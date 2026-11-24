@@ -1,8 +1,21 @@
-import type { CleaningTask, CustomFrequencyRule, Frequency, HomeProfile, ScheduleStyle, TimeBudget } from '@/types';
-import { libraryTasksForHome } from '@/data/taskLibrary';
-import { dayPartsLabel, timeBudgetLabel } from '@/data/home';
-import { addDays, daysBetween, formatShortDate, formatWeekdayName, weekdayIndex } from '@/lib/dates';
-import { frequencyDays, nextDueAfterDone } from '@/lib/tasks';
+
+import type {
+  CleaningTask,
+  CustomFrequencyRule,
+  Frequency,
+  HomeProfile,
+  TimeBudget,
+} from "@/types";
+import { libraryTasksForHome } from "@/data/taskLibrary";
+import { dayPartsLabel, timeBudgetLabel } from "@/data/home";
+import {
+  addDays,
+  daysBetween,
+  formatShortDate,
+  formatWeekdayName,
+  weekdayIndex,
+} from "@/lib/dates";
+import { frequencyDays, nextDueAfterDone } from "@/lib/tasks";
 
 export function buildSuggestedTasks(
   home: HomeProfile,
@@ -27,13 +40,13 @@ export function buildSuggestedTasks(
       enabled: true,
       libraryId: item.id,
       scheduleNote: item.scheduleNote ?? null,
-      source: 'plan',
+      source: "plan",
     }));
 }
 
-export type DayKind = 'open' | 'big' | 'rest' | 'off';
+export type DayKind = "open" | "big" | "rest" | "off";
 
-type CalendarStyle = 'spread' | 'block' | 'mix';
+type CalendarStyle = "spread" | "block" | "mix";
 
 export interface CalendarRules {
   openWeekdays: number[];
@@ -53,94 +66,71 @@ export interface PlannedDay {
 }
 
 function resolveStyle(home: HomeProfile): CalendarStyle {
-  // Obsługa starszych zapisanych ustawień.
-  if (home.style === 'spread' || home.style === 'block' || home.style === 'mix') {
+  if (
+    home.style === "spread" ||
+    home.style === "block" ||
+    home.style === "mix"
+  ) {
     return home.style;
   }
 
-  // Nowe style rooms, tasks i auto dotyczą organizacji czynności,
-  // a nie sposobu rozłożenia obciążenia w kalendarzu.
-  if (home.timeBudget === 'one-day' || home.timeBudget === 'few-days') {
-    return 'block';
+  if (home.timeBudget === "one-day" || home.timeBudget === "few-days") {
+    return "block";
   }
 
-  if (home.timeBudget === 'flexible') {
-    return 'spread';
+  if (home.timeBudget === "flexible") {
+    return "spread";
   }
 
-  return 'mix';
+  return "mix";
 }
 
-function selectedWeekdays(home: HomeProfile): number[] {
-  // Nowe ustawienia – indywidualnie wybrane dni.
-  if (Array.isArray(home.cleaningDays) && home.cleaningDays.length > 0) {
-    return [...new Set(
-      home.cleaningDays.filter(
-        (day) => Number.isInteger(day) && day >= 0 && day <= 6,
-      ),
-    )];
-  }
-
-  // Zgodność ze starszymi ustawieniami.
-  const days: number[] = [];
-
-  if (home.weekdays) days.push(1, 2, 3, 4, 5);
-  if (home.weekends) days.push(6, 0);
-
-  // Dotychczasowy domyślny sposób działania.
-  if (days.length === 0) {
-    days.push(1, 2, 3, 4, 5, 6, 0);
-  }
-
-  return days;
-}
-
-function minutesFor(budget: TimeBudget | null): { base: number; big: number; flexible: boolean } {
+function minutesFor(budget: TimeBudget | null): {
+  base: number;
+  big: number;
+  flexible: boolean;
+} {
   switch (budget) {
-    case 'm10':
+    case "m10":
       return { base: 15, big: 45, flexible: false };
-    case 'few-days':
+    case "few-days":
       return { base: 0, big: 90, flexible: false };
-    case 'one-day':
+    case "one-day":
       return { base: 0, big: 150, flexible: false };
-    case 'flexible':
+    case "flexible":
       return { base: 40, big: 50, flexible: true };
-    case 'm20':
+    case "m20":
     default:
       return { base: 25, big: 60, flexible: false };
   }
 }
 
 export function resolveCalendar(home: HomeProfile): CalendarRules {
-  const selected = selectedWeekdays(home);
+  const allWeekdays = [1, 2, 3, 4, 5, 6, 0];
   const style = resolveStyle(home);
   const minutes = minutesFor(home.timeBudget);
-  const preferBig = selected.includes(6) ? 6 : selected.includes(0) ? 0 : selected[selected.length - 1];
 
   let bigWeekdays: number[] = [];
-  let restWeekdays: number[] = [];
   let openWeekdays: number[] = [];
 
-  if (style === 'spread') {
-    openWeekdays = selected;
-  } else if (style === 'block' && home.timeBudget === 'few-days') {
+  if (style === "spread") {
+    openWeekdays = allWeekdays;
+  } else if (style === "block" && home.timeBudget === "few-days") {
     const prefer = [2, 4, 6, 3, 5, 1, 0];
-    bigWeekdays = prefer.filter((day) => selected.includes(day)).slice(0, 3);
-    if (bigWeekdays.length === 0) bigWeekdays = selected.slice(0, Math.min(3, selected.length));
-    restWeekdays = selected.filter((day) => !bigWeekdays.includes(day));
-  } else if (style === 'block') {
-    bigWeekdays = [preferBig];
-    restWeekdays = selected.filter((day) => day !== preferBig);
+
+    bigWeekdays = prefer.slice(0, 3);
+    openWeekdays = allWeekdays.filter(
+      (day) => !bigWeekdays.includes(day),
+    );
   } else {
-    bigWeekdays = [preferBig];
-    restWeekdays = selected.includes(0) && preferBig !== 0 ? [0] : [];
-    openWeekdays = selected.filter((day) => !bigWeekdays.includes(day) && !restWeekdays.includes(day));
+    bigWeekdays = [6];
+    openWeekdays = allWeekdays.filter((day) => day !== 6);
   }
 
   return {
     openWeekdays,
     bigWeekdays,
-    restWeekdays,
+    restWeekdays: [],
     baseMinutes: minutes.base,
     bigMinutes: minutes.big,
     flexible: minutes.flexible,
@@ -150,16 +140,20 @@ export function resolveCalendar(home: HomeProfile): CalendarRules {
 
 export function dayKind(date: string, calendar: CalendarRules): DayKind {
   const weekday = weekdayIndex(date);
-  if (calendar.bigWeekdays.includes(weekday)) return 'big';
-  if (calendar.openWeekdays.includes(weekday)) return 'open';
-  if (calendar.restWeekdays.includes(weekday)) return 'rest';
-  return 'off';
+
+  if (calendar.bigWeekdays.includes(weekday)) return "big";
+  if (calendar.openWeekdays.includes(weekday)) return "open";
+  if (calendar.restWeekdays.includes(weekday)) return "rest";
+
+  return "off";
 }
 
 export function dayCapacity(date: string, calendar: CalendarRules): number {
   const kind = dayKind(date, calendar);
-  if (kind === 'big') return calendar.bigMinutes;
-  if (kind === 'open') return calendar.baseMinutes;
+
+  if (kind === "big") return calendar.bigMinutes;
+  if (kind === "open") return calendar.baseMinutes;
+
   return 0;
 }
 
@@ -171,30 +165,17 @@ export function nextScheduledDate(
   fromDate: string,
   frequency: Frequency,
   customDays: number | null,
-  home: HomeProfile,
+  _home: HomeProfile,
   customRule?: CustomFrequencyRule | null,
   anchorDate?: string,
 ): string {
-  if (frequency === 'custom' && customRule) {
-    return nextDueAfterDone(
-      frequency,
-      customDays,
-      fromDate,
-      customRule,
-      anchorDate ?? fromDate,
-    );
-  }
-
-  const step = Math.max(1, frequencyDays(frequency, customDays));
-  const calendar = resolveCalendar(home);
-
-  for (let offset = step; offset <= step + 28; offset += step) {
-    const date = addDays(fromDate, offset);
-    const kind = dayKind(date, calendar);
-    if (kind === 'open' || kind === 'big') return date;
-  }
-
-  return addDays(fromDate, step);
+  return nextDueAfterDone(
+    frequency,
+    customDays,
+    fromDate,
+    customRule,
+    anchorDate ?? fromDate,
+  );
 }
 
 export function isScheduledOn(
@@ -202,35 +183,27 @@ export function isScheduledOn(
   date: string,
   calendar: CalendarRules,
 ): boolean {
+  void calendar;
   if (!task.enabled) return false;
   if (date < task.dueDate) return false;
   if (task.dueDate === date) return true;
 
-  if (task.frequency === 'custom' && task.customRule) {
-    let occurrence = task.dueDate;
+  let occurrence = task.dueDate;
 
-    for (let index = 0; index < 3660; index += 1) {
-      occurrence = nextDueAfterDone(
-        task.frequency,
-        task.customDays,
-        occurrence,
-        task.customRule,
-        task.dueDate,
-      );
+  for (let index = 0; index < 3660; index += 1) {
+    occurrence = nextDueAfterDone(
+      task.frequency,
+      task.customDays,
+      occurrence,
+      task.customRule,
+      task.dueDate,
+    );
 
-      if (occurrence === date) return true;
-      if (occurrence > date) return false;
-    }
-
-    return false;
+    if (occurrence === date) return true;
+    if (occurrence > date) return false;
   }
 
-  const step = Math.max(1, frequencyDays(task.frequency, task.customDays));
-
-  if (daysBetween(task.dueDate, date) % step !== 0) return false;
-
-  const kind = dayKind(date, calendar);
-  return kind === 'open' || kind === 'big';
+  return false;
 }
 
 export function tasksForDay(
@@ -244,6 +217,7 @@ export function tasksForDay(
     if (doneTaskIds.has(task.id) || task.lastDoneDate === date) return true;
     if (!task.enabled) return false;
     if (date < today) return task.dueDate === date;
+
     return isScheduledOn(task, date, calendar);
   });
 }
@@ -251,7 +225,8 @@ export function tasksForDay(
 function remainingDays(today: string, calendar: CalendarRules): string[] {
   return horizonDates(today).filter((date) => {
     const kind = dayKind(date, calendar);
-    return kind === 'open' || kind === 'big';
+
+    return kind === "open" || kind === "big";
   });
 }
 
@@ -259,12 +234,20 @@ function stepOf(frequency: Frequency, customDays: number | null): number {
   return Math.max(1, frequencyDays(frequency, customDays));
 }
 
-export function buildPlanTasks(home: HomeProfile, today: string, excludedLibraryIds: string[] = []): CleaningTask[] {
+export function buildPlanTasks(
+  home: HomeProfile,
+  today: string,
+  excludedLibraryIds: string[] = [],
+): CleaningTask[] {
   const calendar = resolveCalendar(home);
   const days = remainingDays(today, calendar);
   const load = new Map<string, number>();
-  const roomLeft = (date: string) => dayCapacity(date, calendar) - (load.get(date) ?? 0);
-  const take = (date: string, minutes: number) => load.set(date, (load.get(date) ?? 0) + minutes);
+
+  const roomLeft = (date: string) =>
+    dayCapacity(date, calendar) - (load.get(date) ?? 0);
+
+  const take = (date: string, minutes: number) =>
+    load.set(date, (load.get(date) ?? 0) + minutes);
 
   const library = libraryTasksForHome(home)
     .filter((item) => !excludedLibraryIds.includes(item.id))
@@ -272,10 +255,7 @@ export function buildPlanTasks(home: HomeProfile, today: string, excludedLibrary
 
   const created: CleaningTask[] = [];
 
-  const push = (
-    item: (typeof library)[number],
-    dueDate: string,
-  ) => {
+  const push = (item: (typeof library)[number], dueDate: string) => {
     created.push({
       id: `plan-${item.id}`,
       roomId: item.roomId,
@@ -289,55 +269,86 @@ export function buildPlanTasks(home: HomeProfile, today: string, excludedLibrary
       enabled: true,
       libraryId: item.id,
       scheduleNote: item.scheduleNote,
-      source: 'plan',
+      source: "plan",
     });
   };
 
   for (const item of library) {
     const step = stepOf(item.frequency, item.customDays);
+
     if (days.length === 0) {
       push(item, addDays(today, step));
       continue;
     }
 
     if (step >= 28) {
-      const anchor = [...days].reverse().find((date) => dayKind(date, calendar) === 'big') ?? days[days.length - 1];
-      push(item, addDays(anchor, step));
+      const anchor =
+        [...days].reverse().find((date) => dayKind(date, calendar) === "big") ??
+        days[days.length - 1];
+
+      push(
+        item,
+        nextDueAfterDone(item.frequency, item.customDays, anchor),
+      );
+
       continue;
     }
 
     if (step >= 7) {
       const ranked = [...days].sort((a, b) => {
-        const bigA = dayKind(a, calendar) === 'big' ? 1 : 0;
-        const bigB = dayKind(b, calendar) === 'big' ? 1 : 0;
+        const bigA = dayKind(a, calendar) === "big" ? 1 : 0;
+        const bigB = dayKind(b, calendar) === "big" ? 1 : 0;
+
         if (bigA !== bigB) return bigB - bigA;
+
         return roomLeft(b) - roomLeft(a);
       });
+
       const fit =
-        ranked.find((date) => roomLeft(date) >= item.minutes - (dayKind(date, calendar) === 'big' ? 10 : 0)) ?? null;
+        ranked.find(
+          (date) =>
+            roomLeft(date) >=
+            item.minutes - (dayKind(date, calendar) === "big" ? 10 : 0),
+        ) ?? null;
+
       if (!fit) {
         const anchor = ranked[0];
         push(item, addDays(anchor, 7));
         continue;
       }
+
       take(fit, item.minutes);
       push(item, fit);
       continue;
     }
 
     let placed: string | null = null;
+
     for (let offset = 0; offset < days.length; offset += 1) {
       const start = days[offset];
+
       if (roomLeft(start) < item.minutes) continue;
-      const hits = days.filter((date) => date >= start && daysBetween(start, date) % step === 0);
-      const fits = hits.every((date) => roomLeft(date) + (dayKind(date, calendar) === 'big' ? 8 : 0) >= item.minutes);
+
+      const hits = days.filter(
+        (date) => date >= start && daysBetween(start, date) % step === 0,
+      );
+
+      const fits = hits.every(
+        (date) =>
+          roomLeft(date) + (dayKind(date, calendar) === "big" ? 8 : 0) >=
+          item.minutes,
+      );
+
       if (!fits) continue;
+
       hits.forEach((date) => take(date, item.minutes));
       placed = start;
       break;
     }
+
     if (!placed) {
       const loosest = [...days].sort((a, b) => roomLeft(b) - roomLeft(a))[0];
+
       if (roomLeft(loosest) >= Math.min(item.minutes, 10)) {
         take(loosest, item.minutes);
         placed = loosest;
@@ -345,48 +356,50 @@ export function buildPlanTasks(home: HomeProfile, today: string, excludedLibrary
         placed = addDays(days[days.length - 1], step);
       }
     }
+
     push(item, placed);
   }
 
-  return created.sort((a, b) => a.dueDate.localeCompare(b.dueDate) || a.title.localeCompare(b.title, 'pl'));
+  return created.sort(
+    (a, b) =>
+      a.dueDate.localeCompare(b.dueDate) ||
+      a.title.localeCompare(b.title, "pl"),
+  );
 }
 
+export type TaskPreviewGroup = "daily" | "regular" | "periodic";
 
-export type TaskPreviewGroup = 'daily' | 'regular' | 'periodic';
+export function getTaskPreviewGroup(task: CleaningTask): TaskPreviewGroup {
+  if (task.frequency === "custom" && task.customRule) {
+    if (task.customRule.unit === "months") return "periodic";
 
-export function getTaskPreviewGroup(
-  task: CleaningTask,
-): TaskPreviewGroup {
-  if (task.frequency === 'custom' && task.customRule) {
-    if (task.customRule.unit === 'months') return 'periodic';
-
-    if (task.customRule.unit === 'days') {
-      return task.customRule.interval <= 3 ? 'daily' : 'regular';
+    if (task.customRule.unit === "days") {
+      return task.customRule.interval <= 3 ? "daily" : "regular";
     }
 
-    return 'regular';
+    return "regular";
   }
 
   if (
-    task.frequency === 'daily' ||
-    (task.frequency === 'custom' &&
+    task.frequency === "daily" ||
+    (task.frequency === "custom" &&
       task.customDays !== null &&
       task.customDays <= 3)
   ) {
-    return 'daily';
+    return "daily";
   }
 
   if (
-    task.frequency === 'monthly' ||
-    task.frequency === 'quarterly' ||
-    (task.frequency === 'custom' &&
+    task.frequency === "monthly" ||
+    task.frequency === "quarterly" ||
+    (task.frequency === "custom" &&
       task.customDays !== null &&
       task.customDays >= 28)
   ) {
-    return 'periodic';
+    return "periodic";
   }
 
-  return 'regular';
+  return "regular";
 }
 
 /**
@@ -414,42 +427,70 @@ export function generateEditedPlan(
   };
 
   const ordered = [...result].sort((a, b) => {
-    const priority = frequencyDays(
-      a.frequency,
-      a.customDays,
-      a.customRule,
-    ) - frequencyDays(
-      b.frequency,
-      b.customDays,
-      b.customRule,
-    );
+    const priority =
+      frequencyDays(a.frequency, a.customDays, a.customRule) -
+      frequencyDays(b.frequency, b.customDays, b.customRule);
 
-    return priority || a.title.localeCompare(b.title, 'pl');
+    return priority || a.title.localeCompare(b.title, "pl");
   });
 
   for (const task of ordered) {
-    const group = getTaskPreviewGroup(task);
     const duration = Math.max(1, task.minutes);
+
+    // Własny harmonogram zadania ma pierwszeństwo przed
+    // automatycznym rozkładaniem zadań w kalendarzu.
+    if (task.frequency === "custom" && task.customRule) {
+      const firstDue = nextDueAfterDone(
+        task.frequency,
+        task.customDays,
+        addDays(today, -1),
+        task.customRule,
+        today,
+      );
+
+      task.dueDate = firstDue;
+
+      if (firstDue >= today && firstDue <= addDays(today, 6)) {
+        take(firstDue, duration);
+      }
+
+      continue;
+    }
+
+    // Standardowe zadania mogą być rozłożone dla wyrównania obciążenia.
+    if (
+      task.frequency === "monthly" ||
+      task.frequency === "quarterly"
+    ) {
+      task.dueDate = nextDueAfterDone(
+        task.frequency,
+        task.customDays,
+        today,
+        undefined,
+        today,
+      );
+      continue;
+    }
 
     if (availableDays.length === 0) {
       task.dueDate = addDays(today, 1);
       continue;
     }
 
-    const candidates = [...availableDays].sort((a, b) => {
-      const bigA = dayKind(a, calendar) === 'big' ? 1 : 0;
-      const bigB = dayKind(b, calendar) === 'big' ? 1 : 0;
+    const group = getTaskPreviewGroup(task);
 
-      if (group === 'periodic' && bigA !== bigB) {
+    const candidates = [...availableDays].sort((a, b) => {
+      const bigA = dayKind(a, calendar) === "big" ? 1 : 0;
+      const bigB = dayKind(b, calendar) === "big" ? 1 : 0;
+
+      if (group === "periodic" && bigA !== bigB) {
         return bigB - bigA;
       }
 
       return roomLeft(b) - roomLeft(a);
     });
 
-    const fit = candidates.find(
-      (date) => roomLeft(date) >= duration,
-    );
+    const fit = candidates.find((date) => roomLeft(date) >= duration);
 
     if (fit) {
       task.dueDate = fit;
@@ -463,36 +504,58 @@ export function generateEditedPlan(
   return result.sort(
     (a, b) =>
       a.dueDate.localeCompare(b.dueDate) ||
-      a.title.localeCompare(b.title, 'pl'),
+      a.title.localeCompare(b.title, "pl"),
   );
 }
-
 
 export function planSubtitle(home: HomeProfile, today: string): string {
   const dates = horizonDates(today);
   const start = formatWeekdayName(dates[0]);
   const end = formatWeekdayName(dates[dates.length - 1]);
+
   const range = `${start.charAt(0).toUpperCase()}${start.slice(1)} – ${end}`;
-  const budget = home.timeBudget === 'flexible' ? 'wtedy, kiedy masz czas' : timeBudgetLabel(home.timeBudget).toLowerCase();
+
+  const budget =
+    home.timeBudget === "flexible"
+      ? "wtedy, kiedy masz czas"
+      : timeBudgetLabel(home.timeBudget).toLowerCase();
+
   return `${range} · ${budget} · ${dayPartsLabel(home.dayParts)}`;
 }
 
-export function dayHeadline(kind: DayKind, minutes: number, flexible: boolean): string {
-  if (kind === 'rest') return 'Według potrzeb';
-  if (kind === 'off') return 'Poza wybranymi dniami';
-  if (flexible) return minutes > 0 ? 'Według potrzeb' : 'Według potrzeb';
-  if (minutes <= 0) return 'Lżej tego dnia';
+export function dayHeadline(
+  kind: DayKind,
+  minutes: number,
+  flexible: boolean,
+): string {
+  if (kind === "rest") return "Według potrzeb";
+  if (kind === "off") return "Poza wybranymi dniami";
+  if (flexible) return "Według potrzeb";
+  if (minutes <= 0) return "Lżej tego dnia";
+
   return `${minutes} min`;
 }
 
 export function daySupport(kind: DayKind, taskCount: number): string | null {
-  if (kind === 'rest') return taskCount > 0 ? 'Możesz tu przenieść coś, co nie wyszło wcześniej.' : 'Odpoczynek lub zadania zaległe.';
-  if (kind === 'off') return 'Nic tu nie układam. Możesz dodać zadanie ręcznie, jeśli chcesz.';
-  if (taskCount === 0) return 'Nic nie jest tu wpisane. To nie jest zaległość.';
+  if (kind === "rest") {
+    return taskCount > 0
+      ? "Możesz tu przenieść coś, co nie wyszło wcześniej."
+      : "Odpoczynek lub zadania zaległe.";
+  }
+
+  if (kind === "off") {
+    return "Nic tu nie układam. Możesz dodać zadanie ręcznie, jeśli chcesz.";
+  }
+
+  if (taskCount === 0) {
+    return "Nic nie jest tu wpisane. To nie jest zaległość.";
+  }
+
   return null;
 }
 
 export function formatPlanRange(today: string): string {
   const dates = horizonDates(today);
+
   return `${formatShortDate(dates[0])} – ${formatShortDate(dates[dates.length - 1])}`;
 }

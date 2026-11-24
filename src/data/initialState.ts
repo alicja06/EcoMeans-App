@@ -1,7 +1,7 @@
 import type { AppState } from '@/types';
 import { emptyHome } from '@/data/home';
 
-export function createInitialState(_today: string): AppState {
+export function createInitialState(): AppState {
   return {
     tasks: [],
     history: [],

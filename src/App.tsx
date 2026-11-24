@@ -11,9 +11,11 @@ import { OnboardingScreen } from '@/screens/onboarding/OnboardingScreen';
 import { WelcomeScreen } from '@/screens/welcome/WelcomeScreen';
 import { AuthScreen } from '@/auth/AuthScreen';
 import { HouseholdChoiceScreen } from '@/auth/HouseholdChoiceScreen';
+import { useNavigation } from "@/store/NavigationContext";
 
 function AppShell() {
   const { session, loading: authLoading } = useAuth();
+  const { isEditingPlan } = useNavigation();
 
   const {
     householdId,
@@ -60,7 +62,7 @@ function AppShell() {
     );
   }
 
-  if (!onboardingComplete) {
+  if (!onboardingComplete || isEditingPlan) {
     return (
       <div className="min-h-dvh w-full bg-canvas">
         <OnboardingScreen />

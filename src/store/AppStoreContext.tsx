@@ -1,4 +1,3 @@
-
 import {
   createContext,
   useCallback,
@@ -9,7 +8,7 @@ import {
   useState,
   useRef,
   type ReactNode,
-} from 'react';
+} from "react";
 
 import type {
   AppState,
@@ -19,19 +18,18 @@ import type {
   Profile,
   RoomId,
   ShoppingItem,
-} from '@/types';
+} from "@/types";
 
-import { appReducer, type AppAction } from '@/store/appReducer';
-import { createInitialState } from '@/data/initialState';
-import { createId } from '@/lib/ids';
-import { todayISO, weekdayIndex } from '@/lib/dates';
-import { resolveCalendar } from '@/lib/schedule';
-import { useHousehold } from '@/auth/HouseholdContext';
-import { useAuth } from '@/auth/AuthContext';
+import { appReducer, type AppAction } from "@/store/appReducer";
+import { createInitialState } from "@/data/initialState";
+import { createId } from "@/lib/ids";
+import { todayISO } from "@/lib/dates";
+import { useHousehold } from "@/auth/HouseholdContext";
+import { useAuth } from "@/auth/AuthContext";
 import {
   loadHouseholdSnapshot,
   type HouseholdSyncVersions,
-} from '@/lib/householdSync';
+} from "@/lib/householdSync";
 
 import {
   saveHouseholdTask,
@@ -42,14 +40,14 @@ import {
   updateHouseholdSettings,
   setTaskCompletion,
   applyHouseholdPlan,
-} from '@/lib/householdWrites';
+} from "@/lib/householdWrites";
 
 import {
   subscribeToHouseholdChanges,
   unsubscribeFromHouseholdChanges,
-} from '@/lib/householdRealtime';
+} from "@/lib/householdRealtime";
 
-import { supabase } from '@/lib/supabase';
+import { supabase } from "@/lib/supabase";
 
 export interface NewTaskInput {
   roomId: RoomId;
@@ -65,15 +63,15 @@ export interface NewTaskInput {
 export type TaskPatch = Partial<
   Pick<
     CleaningTask,
-    | 'title'
-    | 'roomId'
-    | 'frequency'
-    | 'customDays'
-    | 'dueDate'
-    | 'minutes'
-    | 'enabled'
-    | 'scheduleNote'
-    | 'customRule'
+    | "title"
+    | "roomId"
+    | "frequency"
+    | "customDays"
+    | "dueDate"
+    | "minutes"
+    | "enabled"
+    | "scheduleNote"
+    | "customRule"
   >
 >;
 
@@ -86,7 +84,6 @@ export interface AppStore {
   retryLoading: () => void;
   toggleTaskDone: (taskId: string) => void;
   addTask: (input: NewTaskInput) => void;
-  updateTaskDueDate: (taskId: string, dueDate: string) => void;
   updateTask: (taskId: string, patch: TaskPatch) => void;
   skipTask: (taskId: string) => void;
   postponeTask: (taskId: string) => void;
@@ -99,21 +96,25 @@ export interface AppStore {
   clearBoughtShoppingItems: () => void;
   updateProfile: (patch: Partial<Profile>) => void;
   updateHome: (patch: Partial<HomeProfile>) => void;
-  acceptPlan: (tasks: CleaningTask[], home: HomeProfile) => void;
+  acceptPlan: (
+    tasks: CleaningTask[],
+    home: HomeProfile,
+    excludedLibraryTaskIds?: string[],
+  ) => Promise<boolean>;
   resetState: () => void;
 }
 
 const AppStoreContext = createContext<AppStore | null>(null);
 
 function createEmptyState(): AppState {
-  return createInitialState(todayISO());
+  return createInitialState();
 }
 
 function readVersion(value: number | undefined): number {
   const version = Number(value);
 
   if (!Number.isSafeInteger(version) || version < 1) {
-    throw new Error('Serwer nie zwrócił prawidłowego numeru wersji.');
+    throw new Error("Serwer nie zwrócił prawidłowego numeru wersji.");
   }
 
   return version;
@@ -124,29 +125,21 @@ function getErrorMessage(error: unknown): string {
 
   if (
     error &&
-    typeof error === 'object' &&
-    'message' in error &&
-    typeof error.message === 'string'
+    typeof error === "object" &&
+    "message" in error &&
+    typeof error.message === "string"
   ) {
     return error.message;
   }
 
-  return 'Nie udało się zapisać zmian.';
+  return "Nie udało się zapisać zmian.";
 }
 
-export function AppStoreProvider({
-  children,
-}: {
-  children: ReactNode;
-}) {
+export function AppStoreProvider({ children }: { children: ReactNode }) {
   const { householdId, loading: householdLoading } = useHousehold();
   const { user } = useAuth();
 
-  const [state, dispatch] = useReducer(
-    appReducer,
-    undefined,
-    createEmptyState,
-  );
+  const [state, dispatch] = useReducer(appReducer, undefined, createEmptyState);
 
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -157,8 +150,9 @@ export function AppStoreProvider({
     shoppingItems: {},
   });
 
-  const [loadedHouseholdId, setLoadedHouseholdId] =
-    useState<string | null | undefined>(undefined);
+  const [loadedHouseholdId, setLoadedHouseholdId] = useState<
+    string | null | undefined
+  >(undefined);
 
   const [loadError, setLoadError] = useState<string | null>(null);
   const [operationError, setOperationError] = useState<string | null>(null);
@@ -195,7 +189,7 @@ export function AppStoreProvider({
       stateRef.current = snapshot.state;
 
       dispatch({
-        type: 'reset',
+        type: "reset",
         state: snapshot.state,
       });
 
@@ -204,7 +198,7 @@ export function AppStoreProvider({
     } catch (error) {
       if (requestId !== loadRequestRef.current) return;
 
-      console.error('Błąd pobierania danych gospodarstwa:', error);
+      console.error("Błąd pobierania danych gospodarstwa:", error);
 
       setLoadError(getErrorMessage(error));
       setLoadedHouseholdId(undefined);
@@ -231,7 +225,7 @@ export function AppStoreProvider({
       stateRef.current = emptyState;
 
       dispatch({
-        type: 'reset',
+        type: "reset",
         state: emptyState,
       });
 
@@ -244,7 +238,7 @@ export function AppStoreProvider({
     if (!user?.id) {
       loadRequestRef.current += 1;
 
-      setLoadError('Nie udało się ustalić zalogowanego użytkownika.');
+      setLoadError("Nie udało się ustalić zalogowanego użytkownika.");
       setLoadedHouseholdId(undefined);
       return;
     }
@@ -258,13 +252,7 @@ export function AppStoreProvider({
     return () => {
       loadRequestRef.current += 1;
     };
-  }, [
-    householdId,
-    householdLoading,
-    user?.id,
-    retryCount,
-    refreshCloudState,
-  ]);
+  }, [householdId, householdLoading, user?.id, retryCount, refreshCloudState]);
 
   const stateReady = householdId
     ? loadedHouseholdId === householdId
@@ -272,12 +260,7 @@ export function AppStoreProvider({
 
   // Nasłuchiwanie zmian wprowadzonych przez innych domowników.
   useEffect(() => {
-    if (
-      householdLoading ||
-      !householdId ||
-      !user?.id ||
-      !stateReady
-    ) {
+    if (householdLoading || !householdId || !user?.id || !stateReady) {
       return;
     }
 
@@ -301,13 +284,7 @@ export function AppStoreProvider({
       if (refreshTimer) clearTimeout(refreshTimer);
       void unsubscribeFromHouseholdChanges(channel);
     };
-  }, [
-    householdId,
-    householdLoading,
-    user?.id,
-    stateReady,
-    refreshCloudState,
-  ]);
+  }, [householdId, householdLoading, user?.id, stateReady, refreshCloudState]);
 
   const retryLoading = useCallback(() => {
     setRetryCount((count) => count + 1);
@@ -321,20 +298,18 @@ export function AppStoreProvider({
   // Najpierw pobieramy aktualny stan serwera.
   const handleWriteError = useCallback(
     async (error: unknown) => {
-      console.error('Nie udało się zapisać zmian:', error);
+      console.error("Nie udało się zapisać zmian:", error);
 
       const message = getErrorMessage(error);
 
       await refreshCloudState();
 
-      if (message.includes('VERSION_CONFLICT')) {
+      if (message.includes("VERSION_CONFLICT")) {
         setOperationError(
-          'Ktoś zmienił te dane w międzyczasie. Pobraliśmy najnowszy stan. Sprawdź dane i spróbuj ponownie.',
+          "Ktoś zmienił te dane w międzyczasie. Pobraliśmy najnowszy stan. Sprawdź dane i spróbuj ponownie.",
         );
       } else {
-        setOperationError(
-          `Nie udało się zapisać zmian. ${message}`,
-        );
+        setOperationError(`Nie udało się zapisać zmian. ${message}`);
       }
     },
     [refreshCloudState],
@@ -358,17 +333,15 @@ export function AppStoreProvider({
         const expectedVersion = versionsRef.current.tasks[taskId];
 
         if (expectedVersion === undefined) {
-          throw new Error('Brakuje wersji zadania. Odśwież dane.');
+          throw new Error("Brakuje wersji zadania. Odśwież dane.");
         }
 
         const nextState = appReducer(stateRef.current, action);
 
-        const updatedTask = nextState.tasks.find(
-          (task) => task.id === taskId,
-        );
+        const updatedTask = nextState.tasks.find((task) => task.id === taskId);
 
         if (!updatedTask) {
-          throw new Error('Nie udało się przygotować zmiany zadania.');
+          throw new Error("Nie udało się przygotować zmiany zadania.");
         }
 
         const result = await saveHouseholdTask(
@@ -377,9 +350,7 @@ export function AppStoreProvider({
           expectedVersion,
         );
 
-        versionsRef.current.tasks[taskId] = readVersion(
-          result.row_version,
-        );
+        versionsRef.current.tasks[taskId] = readVersion(result.row_version);
 
         stateRef.current = nextState;
         dispatch(action);
@@ -396,9 +367,7 @@ export function AppStoreProvider({
       if (!householdId) return;
 
       const currentState = stateRef.current;
-      const task = currentState.tasks.find(
-        (item) => item.id === taskId,
-      );
+      const task = currentState.tasks.find((item) => item.id === taskId);
 
       if (!task) return;
 
@@ -407,25 +376,21 @@ export function AppStoreProvider({
 
       const existingHistory = isUndo
         ? currentState.history.find(
-            (entry) =>
-              entry.taskId === taskId &&
-              entry.doneDate === today,
+            (entry) => entry.taskId === taskId && entry.doneDate === today,
           )
         : undefined;
 
       if (isUndo && !existingHistory) {
         setOperationError(
-          'Nie znaleziono wpisu historii potrzebnego do cofnięcia wykonania.',
+          "Nie znaleziono wpisu historii potrzebnego do cofnięcia wykonania.",
         );
         return;
       }
 
-      const historyId = isUndo
-        ? existingHistory!.id
-        : createId();
+      const historyId = isUndo ? existingHistory!.id : createId();
 
       const action: AppAction = {
-        type: 'toggleTaskDone',
+        type: "toggleTaskDone",
         taskId,
         today,
         historyId,
@@ -435,17 +400,15 @@ export function AppStoreProvider({
         const expectedVersion = versionsRef.current.tasks[taskId];
 
         if (expectedVersion === undefined) {
-          throw new Error('Brakuje wersji zadania. Odśwież dane.');
+          throw new Error("Brakuje wersji zadania. Odśwież dane.");
         }
 
         const nextState = appReducer(currentState, action);
 
-        const nextTask = nextState.tasks.find(
-          (item) => item.id === taskId,
-        );
+        const nextTask = nextState.tasks.find((item) => item.id === taskId);
 
         if (!nextTask) {
-          throw new Error('Nie udało się przygotować zmiany zadania.');
+          throw new Error("Nie udało się przygotować zmiany zadania.");
         }
 
         const result = await setTaskCompletion({
@@ -459,9 +422,7 @@ export function AppStoreProvider({
           undo: isUndo,
         });
 
-        versionsRef.current.tasks[taskId] = readVersion(
-          result.row_version,
-        );
+        versionsRef.current.tasks[taskId] = readVersion(result.row_version);
 
         stateRef.current = nextState;
         dispatch(action);
@@ -479,8 +440,7 @@ export function AppStoreProvider({
         roomId: input.roomId,
         title: input.title,
         frequency: input.frequency,
-        customDays:
-          input.frequency === 'custom' ? input.customDays : null,
+        customDays: input.frequency === "custom" ? input.customDays : null,
         dueDate: input.startDate,
         lastDoneDate: null,
         previousDueDate: null,
@@ -488,11 +448,11 @@ export function AppStoreProvider({
         enabled: true,
         libraryId: input.libraryId ?? null,
         scheduleNote: input.scheduleNote ?? null,
-        source: 'user',
+        source: "user",
       };
 
       const action: AppAction = {
-        type: 'addTask',
+        type: "addTask",
         task,
       };
 
@@ -502,15 +462,9 @@ export function AppStoreProvider({
       }
 
       try {
-        const result = await saveHouseholdTask(
-          householdId,
-          task,
-          null,
-        );
+        const result = await saveHouseholdTask(householdId, task, null);
 
-        versionsRef.current.tasks[task.id] = readVersion(
-          result.row_version,
-        );
+        versionsRef.current.tasks[task.id] = readVersion(result.row_version);
 
         commitAction(action);
       } catch (error) {
@@ -520,30 +474,17 @@ export function AppStoreProvider({
     [householdId, commitAction, handleWriteError],
   );
 
-  const updateTaskDueDate = useCallback(
-    (taskId: string, dueDate: string) =>
-      persistTaskAction(
-        {
-          type: 'updateTaskDueDate',
-          taskId,
-          dueDate,
-        },
-        taskId,
-      ),
-    [persistTaskAction],
-  );
-
   const updateTask = useCallback(
     (taskId: string, patch: TaskPatch) => {
       const next = { ...patch };
 
-      if (next.frequency && next.frequency !== 'custom') {
+      if (next.frequency && next.frequency !== "custom") {
         next.customDays = null;
       }
 
       return persistTaskAction(
         {
-          type: 'updateTask',
+          type: "updateTask",
           taskId,
           patch: next,
         },
@@ -557,7 +498,7 @@ export function AppStoreProvider({
     (taskId: string) =>
       persistTaskAction(
         {
-          type: 'skipTask',
+          type: "skipTask",
           taskId,
           today: todayISO(),
         },
@@ -570,7 +511,7 @@ export function AppStoreProvider({
     (taskId: string) =>
       persistTaskAction(
         {
-          type: 'postponeTask',
+          type: "postponeTask",
           taskId,
           today: todayISO(),
         },
@@ -582,7 +523,7 @@ export function AppStoreProvider({
   const deleteTask = useCallback(
     async (taskId: string) => {
       if (!householdId) {
-        commitAction({ type: 'deleteTask', taskId });
+        commitAction({ type: "deleteTask", taskId });
         return;
       }
 
@@ -590,19 +531,15 @@ export function AppStoreProvider({
         const expectedVersion = versionsRef.current.tasks[taskId];
 
         if (expectedVersion === undefined) {
-          throw new Error('Brakuje wersji zadania. Odśwież dane.');
+          throw new Error("Brakuje wersji zadania. Odśwież dane.");
         }
 
-        await deleteHouseholdTask(
-          householdId,
-          taskId,
-          expectedVersion,
-        );
+        await deleteHouseholdTask(householdId, taskId, expectedVersion);
 
         delete versionsRef.current.tasks[taskId];
 
         commitAction({
-          type: 'deleteTask',
+          type: "deleteTask",
           taskId,
         });
 
@@ -613,12 +550,7 @@ export function AppStoreProvider({
         await handleWriteError(error);
       }
     },
-    [
-      householdId,
-      commitAction,
-      refreshCloudState,
-      handleWriteError,
-    ],
+    [householdId, commitAction, refreshCloudState, handleWriteError],
   );
 
   // Ulubione produkty – dane indywidualne użytkownika.
@@ -634,14 +566,14 @@ export function AppStoreProvider({
 
       try {
         const { error } = await supabase
-          .from('profiles')
+          .from("profiles")
           .update({ favorite_product_ids: next })
-          .eq('id', user.id);
+          .eq("id", user.id);
 
         if (error) throw error;
 
         commitAction({
-          type: 'toggleFavorite',
+          type: "toggleFavorite",
           productId,
         });
       } catch (error) {
@@ -664,14 +596,14 @@ export function AppStoreProvider({
 
       try {
         const { error } = await supabase
-          .from('profiles')
+          .from("profiles")
           .update({ saved_tip_ids: next })
-          .eq('id', user.id);
+          .eq("id", user.id);
 
         if (error) throw error;
 
         commitAction({
-          type: 'toggleSavedTip',
+          type: "toggleSavedTip",
           tipId,
         });
       } catch (error) {
@@ -693,18 +625,14 @@ export function AppStoreProvider({
       };
 
       try {
-        const result = await saveShoppingItem(
-          householdId,
-          item,
-          null,
-        );
+        const result = await saveShoppingItem(householdId, item, null);
 
         versionsRef.current.shoppingItems[item.id] = readVersion(
           result.row_version,
         );
 
         commitAction({
-          type: 'addShoppingItem',
+          type: "addShoppingItem",
           item,
         });
       } catch (error) {
@@ -725,11 +653,10 @@ export function AppStoreProvider({
 
         if (!item) return;
 
-        const expectedVersion =
-          versionsRef.current.shoppingItems[itemId];
+        const expectedVersion = versionsRef.current.shoppingItems[itemId];
 
         if (expectedVersion === undefined) {
-          throw new Error('Brakuje wersji produktu na liście zakupów.');
+          throw new Error("Brakuje wersji produktu na liście zakupów.");
         }
 
         const updatedItem: ShoppingItem = {
@@ -748,7 +675,7 @@ export function AppStoreProvider({
         );
 
         commitAction({
-          type: 'toggleShoppingItem',
+          type: "toggleShoppingItem",
           itemId,
         });
       } catch (error) {
@@ -763,23 +690,18 @@ export function AppStoreProvider({
       if (!householdId) return;
 
       try {
-        const expectedVersion =
-          versionsRef.current.shoppingItems[itemId];
+        const expectedVersion = versionsRef.current.shoppingItems[itemId];
 
         if (expectedVersion === undefined) {
-          throw new Error('Brakuje wersji produktu na liście zakupów.');
+          throw new Error("Brakuje wersji produktu na liście zakupów.");
         }
 
-        await deleteShoppingItem(
-          householdId,
-          itemId,
-          expectedVersion,
-        );
+        await deleteShoppingItem(householdId, itemId, expectedVersion);
 
         delete versionsRef.current.shoppingItems[itemId];
 
         commitAction({
-          type: 'removeShoppingItem',
+          type: "removeShoppingItem",
           itemId,
         });
       } catch (error) {
@@ -789,38 +711,30 @@ export function AppStoreProvider({
     [householdId, commitAction, handleWriteError],
   );
 
-  const clearBoughtShoppingItems = useCallback(
-    async () => {
-      if (!householdId) return;
+  const clearBoughtShoppingItems = useCallback(async () => {
+    if (!householdId) return;
 
-      try {
-        await clearBoughtShoppingItemsRpc(householdId);
+    try {
+      await clearBoughtShoppingItemsRpc(householdId);
 
-        // Usuwamy lokalnie wersje kupionych pozycji.
-        const boughtIds = stateRef.current.shoppingItems
-          .filter((item) => item.bought)
-          .map((item) => item.id);
+      // Usuwamy lokalnie wersje kupionych pozycji.
+      const boughtIds = stateRef.current.shoppingItems
+        .filter((item) => item.bought)
+        .map((item) => item.id);
 
-        boughtIds.forEach((id) => {
-          delete versionsRef.current.shoppingItems[id];
-        });
+      boughtIds.forEach((id) => {
+        delete versionsRef.current.shoppingItems[id];
+      });
 
-        commitAction({
-          type: 'clearBoughtShoppingItems',
-        });
+      commitAction({
+        type: "clearBoughtShoppingItems",
+      });
 
-        await refreshCloudState();
-      } catch (error) {
-        await handleWriteError(error);
-      }
-    },
-    [
-      householdId,
-      commitAction,
-      refreshCloudState,
-      handleWriteError,
-    ],
-  );
+      await refreshCloudState();
+    } catch (error) {
+      await handleWriteError(error);
+    }
+  }, [householdId, commitAction, refreshCloudState, handleWriteError]);
 
   // Zmiany profilu są indywidualne, nie współdzielone.
   const updateProfile = useCallback(
@@ -828,7 +742,7 @@ export function AppStoreProvider({
       if (!user?.id) return;
 
       const action: AppAction = {
-        type: 'updateProfile',
+        type: "updateProfile",
         patch,
       };
 
@@ -836,7 +750,7 @@ export function AppStoreProvider({
 
       const update: {
         display_name?: string;
-        notifications?: Profile['notifications'];
+        notifications?: Profile["notifications"];
       } = {};
 
       if (patch.name !== undefined) {
@@ -851,9 +765,9 @@ export function AppStoreProvider({
 
       try {
         const { error } = await supabase
-          .from('profiles')
+          .from("profiles")
           .update(update)
-          .eq('id', user.id);
+          .eq("id", user.id);
 
         if (error) throw error;
 
@@ -872,7 +786,7 @@ export function AppStoreProvider({
       if (!householdId) return;
 
       const action: AppAction = {
-        type: 'updateHome',
+        type: "updateHome",
         patch,
       };
 
@@ -887,9 +801,7 @@ export function AppStoreProvider({
           nextState.excludedLibraryTaskIds ?? [],
         );
 
-        versionsRef.current.household = readVersion(
-          result.row_version,
-        );
+        versionsRef.current.household = readVersion(result.row_version);
 
         stateRef.current = nextState;
         dispatch(action);
@@ -902,26 +814,21 @@ export function AppStoreProvider({
 
   // Zatwierdzenie planu w jednej transakcji SQL.
   const acceptPlan = useCallback(
-    async (tasks: CleaningTask[], home: HomeProfile) => {
-      if (!householdId) return;
-
-      const calendar = resolveCalendar(home);
-
-      const cleaningDay =
-        calendar.bigWeekdays[0] ??
-        calendar.openWeekdays[0] ??
-        weekdayIndex(todayISO());
-
-      const stamped = tasks.map((task) => ({
-        ...task,
-        id: createId(),
-      }));
+    async (
+      tasks: CleaningTask[],
+      home: HomeProfile,
+      excludedLibraryTaskIds?: string[],
+    ): Promise<boolean> => {
+      if (!householdId) return false;
 
       const action: AppAction = {
-        type: 'acceptPlan',
-        tasks: stamped,
+        type: "acceptPlan",
+        tasks,
         home,
-        cleaningDay,
+        excludedLibraryTaskIds:
+          excludedLibraryTaskIds ??
+          stateRef.current.excludedLibraryTaskIds ??
+          [],
       };
 
       try {
@@ -936,10 +843,12 @@ export function AppStoreProvider({
           nextState.tasks,
         );
 
-        // Odczytujemy nowe wersje wszystkich zadań i gospodarstwa.
         await refreshCloudState();
+
+        return true;
       } catch (error) {
         await handleWriteError(error);
+        return false;
       }
     },
     [householdId, refreshCloudState, handleWriteError],
@@ -951,7 +860,7 @@ export function AppStoreProvider({
     stateRef.current = emptyState;
 
     dispatch({
-      type: 'reset',
+      type: "reset",
       state: emptyState,
     });
   }, []);
@@ -966,7 +875,6 @@ export function AppStoreProvider({
       retryLoading,
       toggleTaskDone,
       addTask,
-      updateTaskDueDate,
       updateTask,
       skipTask,
       postponeTask,
@@ -992,7 +900,6 @@ export function AppStoreProvider({
       retryLoading,
       toggleTaskDone,
       addTask,
-      updateTaskDueDate,
       updateTask,
       skipTask,
       postponeTask,
@@ -1019,9 +926,7 @@ export function AppStoreProvider({
               Nie udało się załadować danych
             </h2>
 
-            <p className="mb-6 text-sm text-[#4e4d4d]">
-              {loadError}
-            </p>
+            <p className="mb-6 text-sm text-[#4e4d4d]">{loadError}</p>
 
             <button
               type="button"
@@ -1032,9 +937,7 @@ export function AppStoreProvider({
             </button>
           </div>
         ) : (
-          <p className="text-lg text-[#3b742f]">
-            Ładowanie EcoMeans...
-          </p>
+          <p className="text-lg text-[#3b742f]">Ładowanie EcoMeans...</p>
         )}
       </div>
     );
@@ -1069,9 +972,7 @@ export function useAppStore(): AppStore {
   const store = useContext(AppStoreContext);
 
   if (!store) {
-    throw new Error(
-      'useAppStore must be used inside AppStoreProvider',
-    );
+    throw new Error("useAppStore must be used inside AppStoreProvider");
   }
 
   return store;

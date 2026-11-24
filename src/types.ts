@@ -1,84 +1,107 @@
 export type RoomId =
-  | 'kitchen'
-  | 'bathroom'
-  | 'toilet'
-  | 'living'
-  | 'bedroom'
-  | 'hallway'
-  | 'kids'
-  | 'utility'
-  | 'balcony'
-  | 'other';
+  | "kitchen"
+  | "bathroom"
+  | "toilet"
+  | "living"
+  | "bedroom"
+  | "hallway"
+  | "kids"
+  | "utility"
+  | "balcony"
+  | "other"
+  | `custom:${string}`;
 
-export type Frequency = 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'custom';
+export interface CustomRoom {
+  id: `custom:${string}`;
+  name: string;
+}
 
-export type CustomFrequencyUnit = 'days' | 'weeks' | 'months';
+export interface CustomAppliance {
+  id: string;
+  name: string;
+}
+
+export type Frequency =
+  | "daily"
+  | "weekly"
+  | "biweekly"
+  | "monthly"
+  | "quarterly"
+  | "custom";
+
+export type CustomFrequencyUnit = "days" | "weeks" | "months";
 
 export type MonthlyFrequencyPattern =
   | {
-      type: 'dayOfMonth';
+      type: "dayOfMonth";
       day: number;
     }
   | {
-      type: 'weekdayOrdinal';
+      type: "weekdayOrdinal";
       ordinal: 1 | 2 | 3 | 4 | -1;
       weekday: number;
     };
 
 export type CustomFrequencyRule =
   | {
-      unit: 'days';
+      unit: "days";
       interval: number;
     }
   | {
-      unit: 'weeks';
+      unit: "weeks";
       interval: number;
       weekdays: number[];
     }
   | {
-      unit: 'months';
+      unit: "months";
       interval: number;
       monthlyPattern: MonthlyFrequencyPattern;
     };
 
 export type HouseholdSize =
-  | 'alone'
-  | 'one-other'
-  | 'several'
-  | 'partner'
-  | 'family';
+  | "alone"
+  | "one-other"
+  | "several"
+  | "partner"
+  | "family";
 
-export type TimeBudget = 'm10' | 'm20' | 'few-days' | 'one-day' | 'flexible';
+export type TimeBudget = "m10" | "m20" | "few-days" | "one-day" | "flexible";
 
-export type DayPart = 'morning' | 'afternoon' | 'evening';
+export type DayPart = "morning" | "afternoon" | "evening";
 
 export type ScheduleStyle =
-  | 'rooms'
-  | 'tasks'
-  | 'auto'
-  | 'spread'
-  | 'block'
-  | 'mix';
+  | "rooms"
+  | "tasks"
+  | "auto"
+  | "spread"
+  | "block"
+  | "mix";
 
 export type ApplianceId =
-  | 'washer'
-  | 'dishwasher'
-  | 'oven'
-  | 'fridge'
-  | 'hood'
-  | 'coffee'
-  | 'vacuum'
-  | 'aircon';
+  | "washer"
+  | "dishwasher"
+  | "oven"
+  | "fridge"
+  | "hood"
+  | "coffee"
+  | "vacuum"
+  | "aircon";
 
-export type TaskSource = 'plan' | 'user';
+export type TaskSource = "plan" | "user";
 
-export type ProductCategoryId = 'kitchen' | 'bathroom' | 'floors' | 'dishes';
+export type ProductCategoryId = "kitchen" | "bathroom" | "floors" | "dishes";
 
-export type TipCategoryId = 'kitchen' | 'bathroom' | 'floors' | 'whole-home' | 'eco' | 'products';
+export type TipCategoryId =
+  | "kitchen"
+  | "bathroom"
+  | "floors"
+  | "whole-home"
+  | "eco"
+  | "products";
 
-export type SoilLevel = 'light' | 'medium' | 'heavy';
+export type SoilLevel = "light" | "medium" | "heavy";
 
-export type WaterHardness = 'soft' | 'medium' | 'hard';
+export type WaterHardness = "soft" | "medium" | "hard";
 
 export interface Room {
   id: RoomId;
@@ -117,6 +140,8 @@ export interface HomeProfile {
   dayParts: DayPart[];
   style: ScheduleStyle | null;
   onboardingComplete: boolean;
+  customRooms?: CustomRoom[];
+  customAppliances?: CustomAppliance[];
 }
 
 export interface HistoryEntry {
@@ -193,15 +218,15 @@ export interface Tip {
 }
 
 export type Route =
-  | { name: 'home' }
-  | { name: 'rooms' }
-  | { name: 'room'; roomId: RoomId }
-  | { name: 'products' }
-  | { name: 'product'; productId: string }
-  | { name: 'calculators' }
-  | { name: 'tips' }
-  | { name: 'tip'; tipId: string }
-  | { name: 'shopping' }
-  | { name: 'profile' }
-  | { name: 'privacy' }
-  | { name: 'plan' };
+  | { name: "home" }
+  | { name: "rooms" }
+  | { name: "room"; roomId: RoomId }
+  | { name: "products" }
+  | { name: "product"; productId: string }
+  | { name: "calculators" }
+  | { name: "tips" }
+  | { name: "tip"; tipId: string }
+  | { name: "shopping" }
+  | { name: "profile" }
+  | { name: "privacy" }
+  | { name: "plan" };

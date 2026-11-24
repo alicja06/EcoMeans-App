@@ -1,32 +1,46 @@
-import type { AppState, CleaningTask, HistoryEntry, HomeProfile, Profile, ShoppingItem } from '@/types';
-import { addDays } from '@/lib/dates';
-import { nextScheduledDate } from '@/lib/schedule';
-import { nextDueAfterDone } from '@/lib/tasks';
+import type {
+  AppState,
+  CleaningTask,
+  HistoryEntry,
+  HomeProfile,
+  Profile,
+  ShoppingItem,
+} from "@/types";
+import { addDays } from "@/lib/dates";
+import { nextScheduledDate } from "@/lib/schedule";
+import { nextDueAfterDone } from "@/lib/tasks";
 
 export type AppAction =
-  | { type: 'toggleTaskDone'; taskId: string; today: string; historyId: string }
-  | { type: 'addTask'; task: CleaningTask }
-  | { type: 'updateTaskDueDate'; taskId: string; dueDate: string }
-  | { type: 'updateTask'; taskId: string; patch: Partial<CleaningTask> }
-  | { type: 'skipTask'; taskId: string; today: string }
-  | { type: 'postponeTask'; taskId: string; today: string }
-  | { type: 'deleteTask'; taskId: string }
-  | { type: 'toggleFavorite'; productId: string }
-  | { type: 'toggleSavedTip'; tipId: string }
-  | { type: 'addShoppingItem'; item: ShoppingItem }
-  | { type: 'toggleShoppingItem'; itemId: string }
-  | { type: 'removeShoppingItem'; itemId: string }
-  | { type: 'clearBoughtShoppingItems' }
-  | { type: 'updateProfile'; patch: Partial<Profile> }
-  | { type: 'updateHome'; patch: Partial<HomeProfile> }
-  | { type: 'acceptPlan'; tasks: CleaningTask[]; home: HomeProfile; cleaningDay: number }
-  | { type: 'reset'; state: AppState };
+  | { type: "toggleTaskDone"; taskId: string; today: string; historyId: string }
+  | { type: "addTask"; task: CleaningTask }
+  | { type: "updateTask"; taskId: string; patch: Partial<CleaningTask> }
+  | { type: "skipTask"; taskId: string; today: string }
+  | { type: "postponeTask"; taskId: string; today: string }
+  | { type: "deleteTask"; taskId: string }
+  | { type: "toggleFavorite"; productId: string }
+  | { type: "toggleSavedTip"; tipId: string }
+  | { type: "addShoppingItem"; item: ShoppingItem }
+  | { type: "toggleShoppingItem"; itemId: string }
+  | { type: "removeShoppingItem"; itemId: string }
+  | { type: "clearBoughtShoppingItems" }
+  | { type: "updateProfile"; patch: Partial<Profile> }
+  | { type: "updateHome"; patch: Partial<HomeProfile> }
+  | {
+      type: "acceptPlan";
+      tasks: CleaningTask[];
+      home: HomeProfile;
+      excludedLibraryTaskIds: string[];
+    }
+  | { type: "reset"; state: AppState };
 
 function toggleInList(list: string[], id: string): string[] {
   return list.includes(id) ? list.filter((item) => item !== id) : [...list, id];
 }
 
-function toggleTaskDone(state: AppState, action: Extract<AppAction, { type: 'toggleTaskDone' }>): AppState {
+function toggleTaskDone(
+  state: AppState,
+  action: Extract<AppAction, { type: "toggleTaskDone" }>,
+): AppState {
   const task = state.tasks.find((item) => item.id === action.taskId);
   if (!task) return state;
 
@@ -67,15 +81,23 @@ function toggleTaskDone(state: AppState, action: Extract<AppAction, { type: 'tog
             ...item,
             lastDoneDate: action.today,
             previousDueDate: item.dueDate,
-            dueDate: item.frequency === 'custom' && item.customRule
-  ? nextDueAfterDone(
-      item.frequency,
-      item.customDays,
-      action.today,
-      item.customRule,
-      item.dueDate,
-    )
-  : nextScheduledDate(action.today, item.frequency, item.customDays, state.home),
+            dueDate:
+              item.frequency === "custom" && item.customRule
+                ? nextDueAfterDone(
+                    item.frequency,
+                    item.customDays,
+                    action.today,
+                    item.customRule,
+                    item.dueDate,
+                  )
+                : nextScheduledDate(
+                    action.today,
+                    item.frequency,
+                    item.customDays,
+                    state.home,
+                    undefined,
+                    item.dueDate,
+                  ),
           }
         : item,
     ),
@@ -85,127 +107,161 @@ function toggleTaskDone(state: AppState, action: Extract<AppAction, { type: 'tog
 
 export function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
-    case 'toggleTaskDone':
+    case "toggleTaskDone":
       return toggleTaskDone(state, action);
-    case 'addTask':
+    case "addTask":
       return { ...state, tasks: [...state.tasks, action.task] };
-    case 'updateTaskDueDate':
+    case "updateTask":
       return {
         ...state,
         tasks: state.tasks.map((task) =>
-          task.id === action.taskId ? { ...task, dueDate: action.dueDate, previousDueDate: null } : task,
+          task.id === action.taskId
+            ? { ...task, ...action.patch, id: task.id }
+            : task,
         ),
       };
-    case 'updateTask':
-      return {
-        ...state,
-        tasks: state.tasks.map((task) => (task.id === action.taskId ? { ...task, ...action.patch, id: task.id } : task)),
-      };
-    case 'skipTask':
+    case "skipTask":
       return {
         ...state,
         tasks: state.tasks.map((task) => {
           if (task.id !== action.taskId) return task;
-          const base = task.dueDate > action.today ? task.dueDate : action.today;
+          const base =
+            task.dueDate > action.today ? task.dueDate : action.today;
           return {
             ...task,
-            dueDate: task.frequency === 'custom' && task.customRule
-  ? nextDueAfterDone(
-      task.frequency,
-      task.customDays,
-      base,
-      task.customRule,
-      task.dueDate,
-    )
-  : nextScheduledDate(base, task.frequency, task.customDays, state.home),
+            dueDate:
+              task.frequency === "custom" && task.customRule
+                ? nextDueAfterDone(
+                    task.frequency,
+                    task.customDays,
+                    base,
+                    task.customRule,
+                    task.dueDate,
+                  )
+                : nextScheduledDate(
+                    base,
+                    task.frequency,
+                    task.customDays,
+                    state.home,
+                    undefined,
+                    task.dueDate,
+                  ),
             previousDueDate: null,
           };
         }),
       };
-    case 'postponeTask':
+    case "postponeTask":
       return {
         ...state,
         tasks: state.tasks.map((task) =>
-          task.id === action.taskId ? { ...task, dueDate: addDays(action.today, 1), previousDueDate: null } : task,
+          task.id === action.taskId
+            ? {
+                ...task,
+                dueDate: addDays(action.today, 1),
+                previousDueDate: null,
+              }
+            : task,
         ),
       };
-case 'deleteTask': {
-  const taskToDelete = state.tasks.find((task) => task.id === action.taskId);
+    case "deleteTask": {
+      const taskToDelete = state.tasks.find(
+        (task) => task.id === action.taskId,
+      );
 
-  const excludedLibraryTaskIds = taskToDelete?.libraryId
-    ? Array.from(
-        new Set([
-          ...(state.excludedLibraryTaskIds ?? []),
-          taskToDelete.libraryId,
-        ])
-      )
-    : state.excludedLibraryTaskIds ?? [];
+      const excludedLibraryTaskIds = taskToDelete?.libraryId
+        ? Array.from(
+            new Set([
+              ...(state.excludedLibraryTaskIds ?? []),
+              taskToDelete.libraryId,
+            ]),
+          )
+        : (state.excludedLibraryTaskIds ?? []);
 
-  return {
-    ...state,
-    tasks: state.tasks.filter((task) => task.id !== action.taskId),
-    excludedLibraryTaskIds,
-  };
-}
-    case 'toggleFavorite':
-      return { ...state, favoriteProductIds: toggleInList(state.favoriteProductIds, action.productId) };
-    case 'toggleSavedTip':
-      return { ...state, savedTipIds: toggleInList(state.savedTipIds, action.tipId) };
-    case 'addShoppingItem':
+      return {
+        ...state,
+        tasks: state.tasks.filter((task) => task.id !== action.taskId),
+        excludedLibraryTaskIds,
+      };
+    }
+    case "toggleFavorite":
+      return {
+        ...state,
+        favoriteProductIds: toggleInList(
+          state.favoriteProductIds,
+          action.productId,
+        ),
+      };
+    case "toggleSavedTip":
+      return {
+        ...state,
+        savedTipIds: toggleInList(state.savedTipIds, action.tipId),
+      };
+    case "addShoppingItem":
       return { ...state, shoppingItems: [action.item, ...state.shoppingItems] };
-    case 'toggleShoppingItem':
+    case "toggleShoppingItem":
       return {
         ...state,
         shoppingItems: state.shoppingItems.map((item) =>
           item.id === action.itemId ? { ...item, bought: !item.bought } : item,
         ),
       };
-    case 'removeShoppingItem':
-      return { ...state, shoppingItems: state.shoppingItems.filter((item) => item.id !== action.itemId) };
-    case 'clearBoughtShoppingItems':
-      return { ...state, shoppingItems: state.shoppingItems.filter((item) => !item.bought) };
-    case 'updateProfile':
+    case "removeShoppingItem":
+      return {
+        ...state,
+        shoppingItems: state.shoppingItems.filter(
+          (item) => item.id !== action.itemId,
+        ),
+      };
+    case "clearBoughtShoppingItems":
+      return {
+        ...state,
+        shoppingItems: state.shoppingItems.filter((item) => !item.bought),
+      };
+    case "updateProfile":
       return { ...state, profile: { ...state.profile, ...action.patch } };
-    case 'updateHome':
+    case "updateHome":
       return { ...state, home: { ...state.home, ...action.patch } };
-case 'acceptPlan': {
-  const excludedIds = new Set(state.excludedLibraryTaskIds ?? []);
+    case "acceptPlan": {
+      const excludedIds = new Set(action.excludedLibraryTaskIds);
 
-  const existingLibraryTasks = new Map(
-    state.tasks
-      .filter((task) => task.libraryId)
-      .map((task) => [task.libraryId!, task]),
-  );
+      const existingTasksById = new Map(
+        state.tasks.map((task) => [task.id, task]),
+      );
 
-  const plannedTasks = action.tasks
-    .filter((task) => !task.libraryId || !excludedIds.has(task.libraryId))
-    .map((task) => {
-      if (!task.libraryId) return task;
+      const existingLibraryTasks = new Map(
+        state.tasks
+          .filter((task) => task.libraryId)
+          .map((task) => [task.libraryId!, task]),
+      );
 
-      const existingTask = existingLibraryTasks.get(task.libraryId);
+      const plannedTasks = action.tasks
+        .filter((task) => !task.libraryId || !excludedIds.has(task.libraryId))
+        .map((task) => {
+          const existingTask = task.libraryId
+            ? existingLibraryTasks.get(task.libraryId)
+            : existingTasksById.get(task.id);
 
-      if (!existingTask) return task;
+          if (!existingTask) return task;
+
+          return {
+            ...existingTask,
+            ...task,
+            id: existingTask.id,
+            lastDoneDate: existingTask.lastDoneDate,
+            previousDueDate: existingTask.previousDueDate,
+          };
+        });
+
+      const userTasks = state.tasks.filter((task) => task.source === "user");
 
       return {
-        ...task,
-        ...existingTask,
-        id: existingTask.id,
+        ...state,
+        tasks: [...userTasks, ...plannedTasks],
+        excludedLibraryTaskIds: action.excludedLibraryTaskIds,
+        home: { ...action.home, onboardingComplete: true },
       };
-    });
-
-  const plannedTaskIds = new Set(plannedTasks.map((task) => task.id));
-
-  const existingCustomTasks = state.tasks.filter(
-    (task) => !task.libraryId && !plannedTaskIds.has(task.id),
-  );
-
-  return {
-    ...state,
-    tasks: [...plannedTasks, ...existingCustomTasks],
-    home: { ...action.home, onboardingComplete: true },
-  };
-}
-    case 'reset':
+    }
+    case "reset":
       return action.state;
   }
 }

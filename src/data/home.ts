@@ -81,6 +81,8 @@ export function emptyHome(): HomeProfile {
     dayParts: [],
     style: null,
     onboardingComplete: false,
+    customRooms: [],
+    customAppliances: [],
   };
 }
 
